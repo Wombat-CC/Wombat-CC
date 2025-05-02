@@ -545,23 +545,23 @@ void startUp() {
 //     }
 // }
 
-// void driveForward(int speed, int distance) {
-//     if (speed > 0 && distance > 0) {
-//         forwardDrive(distance * STRAIGHT_CM_TO_TICKS, speed);
-//         printf("Drove forward %d inches at speed %d.\n", distance, speed);
-//     } else {
-//         printf("Invalid parameters for drive_forward.\nUsage: drive_forward <speed> <distance>\n");
-//     }
-// }
+void driveForward(int distance, int speed) {
+    if (speed > 0 && distance > 0) {
+        forwardDrive(distance * STRAIGHT_CM_TO_TICKS, speed);
+        printf("Drove forward %d inches at speed %d.\n", distance, speed);
+    } else {
+        printf("Invalid parameters for driveForward.\nUsage: driveForward <distance> <speed>\n");
+    }
+}
 
-// void driveBackward(int speed, int distance) {
-//     if (speed > 0 && distance > 0) {
-//         backwardDrive(distance * STRAIGHT_CM_TO_TICKS, speed);
-//         printf("Drove backward %d inches at speed %d.\n", distance, speed);
-//     } else {
-//         printf("Invalid parameters for drive_backward.\nUsage: drive_backward <speed> <distance>\n");
-//     }
-// }
+void driveBackward(int distance, int speed) {
+    if (speed > 0 && distance > 0) {
+        backwardDrive(distance * STRAIGHT_CM_TO_TICKS, speed);
+        printf("Drove backward %d inches at speed %d.\n", distance, speed);
+    } else {
+        printf("Invalid parameters for driveBackward.\nUsage: driveBackward <distance> <speed>\n");
+    }
+}
 
 // void driveRight(int speed, int distance) {
 //     if (speed > 0 && distance > 0) {
@@ -637,21 +637,21 @@ void startUp() {
 //     return;
 // }
 
-// void openPos() {
-//     openClaw();
-//     return;
-// }
+void openPos() {
+    openClaw();
+    return;
+}
 
-// void closePos(int position) {
-//     if (position == 0) {
-//         closeClaw(0);
-//     }
-//     else {
-//         closeClaw(1);
-//     }
-//     printf("Closed claw.\n");
-//     return;
-// }
+void closePos(int position) {
+    if (position == 0) {
+        closeClaw(0);
+    }
+    else {
+        closeClaw(1);
+    }
+    printf("Closed claw.\n");
+    return;
+}
 
 // void closeBox() {
 //     enable_servo(servos.claw);
@@ -660,60 +660,60 @@ void startUp() {
 //     printf("Closed claw to Box.\n");
 // }
 
-// void driveDirection(int direction, int distance, int speed) {
-//     if (direction < 0) {
-//         direction = (direction % 360 + 360) % 360; // Convert negative direction to positive
-//     }
-//     if (direction >= 0 && direction <= 360 && distance > 0 && speed > 0) {
-//         // Calculate wheel speeds based on direction
-//         double rad = direction * (M_PI / 180.0);
-//         double cos_dir = cos(rad);
-//         double sin_dir = sin(rad);
+void driveDirection(int direction, int distance, int speed) {
+    if (direction < 0) {
+        direction = (direction % 360 + 360) % 360; // Convert negative direction to positive
+    }
+    if (direction >= 0 && direction <= 360 && distance > 0 && speed > 0) {
+        // Calculate wheel speeds based on direction
+        double rad = direction * (M_PI / 180.0);
+        double cos_dir = cos(rad);
+        double sin_dir = sin(rad);
 
-//         int frontLeftSpeed = (int)(speed * (cos_dir - sin_dir));
-//         int frontRightSpeed = (int)(speed * (cos_dir + sin_dir));
-//         int rearLeftSpeed = (int)(speed * (cos_dir + sin_dir));
-//         int rearRightSpeed = (int)(speed * (cos_dir - sin_dir));
-//         int values[] = {frontLeftSpeed, frontRightSpeed, rearLeftSpeed, rearRightSpeed};
+        int frontLeftSpeed = (int)(speed * (cos_dir - sin_dir));
+        int frontRightSpeed = (int)(speed * (cos_dir + sin_dir));
+        int rearLeftSpeed = (int)(speed * (cos_dir + sin_dir));
+        int rearRightSpeed = (int)(speed * (cos_dir - sin_dir));
+        int values[] = {frontLeftSpeed, frontRightSpeed, rearLeftSpeed, rearRightSpeed};
 
-//         // Find the maximum calculated speed
-//         int maxSpeed = fmax(values[0], fmax(values[1], fmax(values[2], values[3])));
+        // Find the maximum calculated speed
+        int maxSpeed = fmax(values[0], fmax(values[1], fmax(values[2], values[3])));
 
-//         // Calculate the scaling factor
-//         double scaleFactor = 1.0;
-//         if (maxSpeed > 1500) {
-//             scaleFactor = 1500.0 / maxSpeed;
-//         }
-//         printf("scaleFactor: %f,\n", scaleFactor);
-//         printf("maxSpeed: %d,\n", maxSpeed);
+        // Calculate the scaling factor
+        double scaleFactor = 1.0;
+        if (maxSpeed > 1500) {
+            scaleFactor = 1500.0 / maxSpeed;
+        }
+        printf("scaleFactor: %f,\n", scaleFactor);
+        printf("maxSpeed: %d,\n", maxSpeed);
 
-//         // Apply the scaling factor to all speeds
-//         frontLeftSpeed = (int)(frontLeftSpeed * scaleFactor);
-//         frontRightSpeed = (int)(frontRightSpeed * scaleFactor);
-//         rearLeftSpeed = (int)(rearLeftSpeed * scaleFactor);
-//         rearRightSpeed = (int)(rearRightSpeed * scaleFactor);
-//         printf("frontLeftSpeed: %d,\nfrontRightSpeed: %d,\nrearLeftSpeed: %d,\nrearRightSpeed: %d,\n", frontLeftSpeed, frontRightSpeed, rearLeftSpeed, rearRightSpeed);
+        // Apply the scaling factor to all speeds
+        frontLeftSpeed = (int)(frontLeftSpeed * scaleFactor);
+        frontRightSpeed = (int)(frontRightSpeed * scaleFactor);
+        rearLeftSpeed = (int)(rearLeftSpeed * scaleFactor);
+        rearRightSpeed = (int)(rearRightSpeed * scaleFactor);
+        printf("frontLeftSpeed: %d,\nfrontRightSpeed: %d,\nrearLeftSpeed: %d,\nrearRightSpeed: %d,\n", frontLeftSpeed, frontRightSpeed, rearLeftSpeed, rearRightSpeed);
 
-//         // Call the appropriate drive functions
-//         move_relative_position(wheels.frontLeft, frontLeftSpeed, (frontLeftSpeed < 0) ? -distance : distance);
-//         move_relative_position(wheels.frontRight, frontRightSpeed, (frontRightSpeed < 0) ? -distance : distance);
-//         move_relative_position(wheels.backLeft, rearLeftSpeed, (rearLeftSpeed < 0) ? -distance : distance);
-//         move_relative_position(wheels.backRight, rearRightSpeed, (rearRightSpeed < 0) ? -distance : distance);
-//         while (get_motor_done(wheels.frontLeft) == 0 && get_motor_done(wheels.frontRight) == 0 && get_motor_done(wheels.backLeft) == 0 && get_motor_done(wheels.backRight) == 0) {
-//             msleep(10);
-//         }
-//         mav(wheels.frontLeft, (-1) * frontLeftSpeed);
-//         mav(wheels.frontRight, (-1) * frontRightSpeed);
-//         mav(wheels.backLeft, (-1) * rearLeftSpeed);
-//         mav(wheels.backRight, (-1) * rearRightSpeed);
-//         msleep(30);
-//         alloff(); // Stop the motors
-//         printf("Drove in direction %d for %d units at speed %d.\n", direction, distance, speed);
+        // Call the appropriate drive functions
+        move_relative_position(wheels.frontLeft, frontLeftSpeed, (frontLeftSpeed < 0) ? -distance : distance);
+        move_relative_position(wheels.frontRight, frontRightSpeed, (frontRightSpeed < 0) ? -distance : distance);
+        move_relative_position(wheels.backLeft, rearLeftSpeed, (rearLeftSpeed < 0) ? -distance : distance);
+        move_relative_position(wheels.backRight, rearRightSpeed, (rearRightSpeed < 0) ? -distance : distance);
+        while (get_motor_done(wheels.frontLeft) == 0 && get_motor_done(wheels.frontRight) == 0 && get_motor_done(wheels.backLeft) == 0 && get_motor_done(wheels.backRight) == 0) {
+            msleep(10);
+        }
+        mav(wheels.frontLeft, (-1) * frontLeftSpeed);
+        mav(wheels.frontRight, (-1) * frontRightSpeed);
+        mav(wheels.backLeft, (-1) * rearLeftSpeed);
+        mav(wheels.backRight, (-1) * rearRightSpeed);
+        msleep(30);
+        ao(); // Stop the motors
+        printf("Drove in direction %d for %d units at speed %d.\n", direction, distance, speed);
 
-//     } else {
-//         printf("Invalid parameters for driveDirection. Usage: driveDirection <direction> <distance> <speed>\n");
-//     }
-// }
+    } else {
+        printf("Invalid parameters for driveDirection. Usage: driveDirection <direction> <distance> <speed>\n");
+    }
+}
 
 // void tapeDetection(int speed, int direction) {
 //     alignRotation(direction, speed);
