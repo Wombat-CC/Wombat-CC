@@ -2,7 +2,7 @@
 
 ## Overview
 
-The architecture of Project X is designed to support autonomous navigation and task execution using a combination of sensors, motors, and servos. The project is built using C and CMake, and it is designed to run on the KIPR Wombat controller. The main components of the project include the following:
+The architecture of Project XBOT is designed to support autonomous navigation and task execution using a combination of sensors, motors, and servos. The project is built using C and CMake, and it is designed to run on the KIPR Wombat controller. The main components of the project include the following:
 
 - **Sensors**: Used for obstacle detection and alignment.
 - **Motors**: Used for movement and navigation.

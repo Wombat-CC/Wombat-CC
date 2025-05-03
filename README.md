@@ -1,10 +1,10 @@
-# Project X
+# Project XBOT
 
 ## Documentation
 
 For detailed documentation about this project, including setup instructions, architecture details, and usage guides, please visit our documentation website:
 
-[Project X Documentation](https://gmhs-botball-team-504.gitbook.io/project-x/)
+[Project XBOT Documentation](https://gmhs-botball-team-504.gitbook.io/project-x/)
 
 ## License
 
