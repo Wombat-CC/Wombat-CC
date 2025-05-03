@@ -1,0 +1,54 @@
+name: Release
+
+on:
+    push:
+        branches: [master]
+
+jobs:
+    build-and-release:
+        runs-on: ubuntu-latest
+        container:
+            image: sillyfreak/wombat-cross
+            options: --user root
+
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+
+            - name: Install dependencies
+              run: |
+                  apt-get update
+                  apt-get install -y cmake build-essential gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
+
+            - name: Configure project
+              run: |
+                  mkdir -p build
+                  cd build
+                  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc ..
+
+            - name: Build
+              run: |
+                  cd build
+                  cmake --build .
+
+            - name: Create Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: v${{ github.run_number }}
+                  release_name: Release v${{ github.run_number }}
+                  draft: false
+                  prerelease: false
+
+            - name: Upload Binary
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./build/botball_user_program
+                  asset_name: botball_user_program
+                  asset_content_type: application/octet-stream

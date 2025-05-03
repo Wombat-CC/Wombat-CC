@@ -1,0 +1,41 @@
+name: CI
+
+on:
+    push:
+        branches: [develop]
+    pull_request:
+        branches: [develop]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        container:
+            image: sillyfreak/wombat-cross
+            options: --user root
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Install dependencies
+              run: |
+                  apt-get update
+                  apt-get install -y cmake build-essential gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
+
+            - name: Configure project
+              run: |
+                  mkdir -p build
+                  cd build
+                  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc ..
+
+            - name: Build
+              run: |
+                  cd build
+                  cmake --build .
+
+            - name: Verify build artifacts
+              run: |
+                  if [ ! -f build/botball_user_program ]; then
+                    echo "Build artifact not found!"
+                    exit 1
+                  fi
+                  file build/botball_user_program | grep -q "ARM aarch64"
