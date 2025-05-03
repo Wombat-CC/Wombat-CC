@@ -39,21 +39,4 @@ def main():
     
     # Run CMake and build in Docker
     build_cmd = [
-        'docker', 'run', '--rm',
-        '-v', f'{current_dir}:/app',
-        'project-x-build',
-        'bash', '-c', 
-        'mkdir -p /app/out/build && cd /app/out/build && ' + 
-        'cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc /app && ' + 
-        'cmake --build .'
-    ]
-    
-    if not run_command(build_cmd):
-        print("Build failed. See error messages above.")
-        sys.exit(1)
-        
-    print(f"Build completed successfully.")
-    print(f"Executable location: {os.path.join(build_dir, 'botball_user_program')}")
-
-if __name__ == '__main__':
-    main()
+        'd
