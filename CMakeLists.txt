@@ -4,19 +4,25 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
 set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
 # Library paths for ARM64
 link_directories("/usr/lib/aarch64-linux-gnu" "/lib/aarch64-linux-gnu")
 
 # Project definition
-project(Project-X C)
+project(Project-X C CXX)
 
 # Compiler flags matching the command line approach
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 # C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+
+# C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -24,6 +30,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 # Add source files
 file(GLOB SOURCES
     "src/*.c"
+    "src/*.cpp"
 )
 
 # Add header files
