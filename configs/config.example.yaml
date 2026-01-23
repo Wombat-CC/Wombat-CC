@@ -1,0 +1,171 @@
+# Example Custom Build Configuration for Project-XBOT
+# Copy this file to config.yaml and modify as needed for your build requirements
+# No external dependencies required - uses built-in YAML parser
+
+# ============================================================================
+# DOCKER CONFIGURATION
+# ============================================================================
+
+# Docker image to use for cross-compilation
+# Default: sillyfreak/wombat-cross (contains ARM64 toolchain and KIPR libraries)
+# Change this if you have a custom Docker image with different toolchains
+docker_image: sillyfreak/wombat-cross
+
+# ============================================================================
+# COMPILER CONFIGURATION
+# ============================================================================
+
+compiler:
+    # Cross-compiler executable name
+    # Default: aarch64-linux-gnu-g++ (ARM64 GNU C++ compiler)
+    # Other options: g++, clang++, arm-linux-gnueabihf-g++, etc.
+    cross_compiler: aarch64-linux-gnu-g++
+
+    # Compiler warning and diagnostic flags (space-separated)
+    # Common flags:
+    #   -Wall: Enable all common warnings
+    #   -Wextra: Enable extra warnings
+    #   -Werror: Treat warnings as errors
+    #   -Wpedantic: Strict ISO C/C++ compliance
+    #   -Wno-unused: Suppress unused variable warnings
+    # Default: -Wall
+    flags: -Wall -Wextra
+
+    # Optimization level
+    # Options:
+    #   -Og: Debug optimization (best for debugging, enables optimizations that don't interfere with debugging)
+    #   -O0: No optimization (slowest execution, rarely recommended)
+    #   -O1: Basic optimization (moderate speed improvement)
+    #   -O2: Recommended optimization (good balance of speed and size)
+    #   -O3: Aggressive optimization (maximum speed, larger binary)
+    #   -Os: Optimize for size (smaller binary)
+    #   -Ofast: Aggressive optimization (may break standards compliance)
+    # Default: -O2
+    optimization: -O3
+
+    # Include debug symbols in the binary
+    # true: Adds -g flag (enables debugging with gdb, larger binary)
+    # false: No debug symbols (smaller binary, no debugging info)
+    # Default: true
+    debug: false
+
+    # C language standard
+    # Options: c89, c90, c99, c11, c17, c23, gnu89, gnu99, gnu11, gnu17, gnu23
+    # Default: c11 (ISO C11 standard)
+    c_standard: c11
+
+    # C++ language standard
+    # Options: c++98, c++03, c++11, c++14, c++17, c++20, c++23, gnu++11, gnu++14, gnu++17, gnu++20, gnu++23
+    # Default: c++17 (ISO C++17 standard)
+    cpp_standard: c++17
+
+# ============================================================================
+# LINKER CONFIGURATION
+# ============================================================================
+
+linker:
+    # Libraries to link against (space-separated, without -l prefix)
+    # Each library name will automatically get -l prepended during linking
+    # Default libraries:
+    #   kipr: KIPR Wombat controller library (required for Botball)
+    #   pthread: POSIX threads library
+    #   m: Math library (sin, cos, sqrt, etc.)
+    #   z: Compression library (zlib)
+    # Default: kipr pthread m z
+    libraries: kipr pthread m z
+
+    # Additional linker flags (space-separated)
+    # Common flags:
+    #   -static: Create a statically linked binary (no external dependencies)
+    #   -s: Strip debug symbols from output (smaller binary)
+    #   -Wl,--gc-sections: Remove unused code sections
+    #   -L/path/to/libs: Add library search path
+    # Default: empty
+    flags: ""
+
+# ============================================================================
+# DIRECTORY STRUCTURE
+# ============================================================================
+
+directories:
+    # Source code directory (relative to project root)
+    # This directory should contain your .c, .cc, .cpp, .cxx files
+    # Default: src
+    source: src
+
+    # Header files directory (relative to project root)
+    # This directory contains your .h, .hpp header files
+    # Will be added to compiler include path with -I flag
+    # Default: include
+    include: include
+
+    # Output directory for all build artifacts (relative to project root)
+    # All intermediate and final build files will be placed here
+    # Default: out
+    output: out
+
+    # Object files subdirectory (inside output directory)
+    # Compiled .o object files will be stored here
+    # Default: obj
+    objects: obj
+
+    # Final executable subdirectory (inside output directory)
+    # The final linked executable will be placed here
+    # Default: build
+    build: build
+
+# ============================================================================
+# OUTPUT CONFIGURATION
+# ============================================================================
+
+# Name of the output executable file
+# This is the name of the final binary that will be created
+# Default: botball_user_program
+output_name: botball_user_program
+
+# ============================================================================
+# ADDITIONAL COMPILER/LINKER ARGUMENTS
+# ============================================================================
+
+# Additional compiler and linker arguments (passed through as-is)
+# Use this for:
+#   - Preprocessor definitions: -DDEBUG, -DVERSION=1.0
+#   - Additional include paths: -I/custom/path
+#   - Feature flags: -DENABLE_LOGGING
+#
+# These can also be passed via command line:
+#   python build.py -- -DDEBUG -DVERSION=1.0
+#
+# Format: List of strings (YAML list syntax)
+# Examples:
+#   extra_args: ["-DDEBUG", "-DVERSION=1.0", "-DENABLE_LOGGING"]
+#   extra_args:
+#     - "-DDEBUG"
+#     - "-DVERSION=1.0"
+#
+# Default: [] (empty list)
+extra_args: []
+
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+#
+# Debug build (debug optimization, debug symbols):
+#   compiler:
+#     optimization: -Og
+#     debug: true
+#     flags: -Wall -Wextra
+#
+# Release build (maximum optimization, no debug symbols):
+#   compiler:
+#     optimization: -O3
+#     debug: false
+#     flags: -Wall
+#
+# Custom defines:
+#   extra_args: ["-DDEBUG", "-DVERSION=1.0", "-DFEATURE_X"]
+#
+# Different C++ standard:
+#   compiler:
+#     cpp_standard: c++20
+#

@@ -1,0 +1,49 @@
+# Production Build Configuration for Project-XBOT
+# Optimized for performance and minimal binary size
+# Usage: python build.py --config config.prod.yaml
+
+# Docker image to use for cross-compilation
+docker_image: sillyfreak/wombat-cross
+
+# Compiler configuration - Production settings
+compiler:
+  # Cross-compiler executable name
+  cross_compiler: aarch64-linux-gnu-g++
+  
+  # Essential warnings only
+  flags: -Wall
+  
+  # Aggressive optimization for maximum performance
+  optimization: -O3
+  
+  # No debug symbols for smaller binary size
+  debug: false
+  
+  # C language standard
+  c_standard: c11
+  
+  # C++ language standard
+  cpp_standard: c++17
+
+# Linker configuration
+linker:
+  # Standard libraries for Botball/KIPR development
+  libraries: kipr pthread m z
+  
+  # Strip symbols for smaller binary (optional)
+  # Uncomment to enable: flags: "-s"
+  flags: ""
+
+# Build directory structure
+directories:
+  source: src
+  include: include
+  output: out
+  objects: obj
+  build: build
+
+# Output executable name
+output_name: botball_user_program
+
+# No extra arguments for production
+extra_args: []
