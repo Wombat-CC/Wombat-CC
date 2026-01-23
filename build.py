@@ -99,25 +99,26 @@ def main():
         print("Failed to prepare Docker image.", file=sys.stderr)
         sys.exit(1)
 
-    # Verify the cross C++ compiler exists inside the image
-    print("Checking cross C++ toolchain in container...")
-    preflight_cmd = ["docker", "run", "--rm"]
-    if args.ci:
-        preflight_cmd += ["--user", "root"]
-    if host_arch in ("arm64", "aarch64", "arm64e"):
-        preflight_cmd += ["--platform", "linux/amd64"]
-    preflight_cmd += [
-        image,
-        "bash",
-        "-lc",
-        "command -v aarch64-linux-gnu-g++ && aarch64-linux-gnu-g++ --version | head -n 1",
-    ]
-    if not run_command(preflight_cmd):
-        print(
-            "aarch64-linux-gnu-g++ not found in the image. Please ensure the image provides the cross C++ compiler.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    # Verify the cross C++ compiler exists inside the image (only if --verbose)
+    if args.verbose:
+        print("Checking cross C++ toolchain in container...")
+        preflight_cmd = ["docker", "run", "--rm"]
+        if args.ci:
+            preflight_cmd += ["--user", "root"]
+        if host_arch in ("arm64", "aarch64", "arm64e"):
+            preflight_cmd += ["--platform", "linux/amd64"]
+        preflight_cmd += [
+            image,
+            "bash",
+            "-lc",
+            "command -v aarch64-linux-gnu-g++ && aarch64-linux-gnu-g++ --version | head -n 1",
+        ]
+        if not run_command(preflight_cmd):
+            print(
+                "aarch64-linux-gnu-g++ not found in the image. Please ensure the image provides the cross C++ compiler.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # Discover sources
     src_dir = os.path.join(os.getcwd(), "src")
@@ -182,7 +183,7 @@ aarch64-linux-gnu-g++ $c_objs $cpp_objs -o {target} -lkipr -lpthread -lm -lz {ex
 
     compile_cmd = compile_script
 
-    print("Building project inside Docker container using aarch64-linux-gnu-g++...")
+    print("Building project inside Docker container...")
     docker_cmd = ["docker", "run", "--rm"]
     if args.ci:
         docker_cmd += ["--user", "root"]
