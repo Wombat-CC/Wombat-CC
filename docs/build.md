@@ -4,49 +4,61 @@ This document provides detailed instructions on how to build the project.
 
 ## Build System
 
-The project uses CMake as its build system. CMake is a cross-platform tool that automates the build process for software projects. It generates native build files for various platforms, such as Makefiles for Unix-based systems or Visual Studio project files for Windows.
+The recommended build path is a direct g++ invocation inside the published Docker image `sillyfreak/wombat-cross` (which contains the full cross toolchain and KIPR libraries). This works on macOS, Windows, and Linux with Docker installed.
 
 ## Required Tools and Dependencies
 
-To build the project, you will need the following tools and dependencies:
+To build the project, you will need:
 
-- CMake (version 3.10 or higher)
-- Docker (for cross-compilation)
-- A C compiler (e.g., GCC)
-- A C++ compiler (e.g., G++)
+- Docker
+- Internet access to pull `sillyfreak/wombat-cross`
 
-## Build Instructions
+## Build Steps
 
 1. Clone the repository:
 
-   ```sh
-   git clone https://github.com/GMHS-BotBall-Team-504/Project-X.git
-   cd Project-X
-   ```
+    ```sh
+    git clone https://github.com/GMHS-BotBall-Team-504/Project-X.git
+    cd Project-X
+    ```
 
 2. Create the build directory:
 
-   ```sh
-   mkdir -p out/build
-   ```
+    ```sh
+    mkdir -p out/build
+    ```
 
-3. Build the Docker image:
+3. Build using the helper script (cross-platform):
 
-   ```sh
-   docker build -t project-x-build .
-   ```
+    ```sh
+    python3 build.py
+    ```
 
-4. Run the build process inside the Docker container:
+4. Alternatively, run Docker manually (Unix shells):
 
-   ```sh
-   docker run --rm -v $(pwd):/app project-x-build bash -c 'mkdir -p /app/out/build && cd /app/out/build && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc /app && cmake --build .'
-   ```
+    ```sh
+    docker run --rm -v "$(pwd)":/work -w /work \
+      sillyfreak/wombat-cross bash -lc \
+      'mkdir -p out/build && aarch64-linux-gnu-g++ -Wall -O2 -g -Iinclude \
+        -x c -std=c11 src/*.c -x c++ -std=c++17 src/*.cc src/*.cpp src/*.cxx \
+        -o out/build/botball_user_program -lkipr -lpthread -lm -lz'
+    ```
 
-5. The built executable will be located in the `out/build` directory:
+5. On Windows (PowerShell):
 
-   ```sh
-   ls out/build/botball_user_program
-   ```
+    ```powershell
+    docker run --rm -v ${PWD}:/work -w /work `
+      sillyfreak/wombat-cross bash -lc `
+      "mkdir -p out/build && aarch64-linux-gnu-g++ -Wall -O2 -g -Iinclude `
+        -x c -std=c11 src/*.c -x c++ -std=c++17 src/*.cc src/*.cpp src/*.cxx `
+        -o out/build/botball_user_program -lkipr -lpthread -lm -lz"
+    ```
+
+6. The built executable will be located in the `out/build` directory:
+
+    ```sh
+    ls out/build/botball_user_program
+    ```
 
 ## Common Build Issues and Troubleshooting
 
@@ -54,17 +66,13 @@ To build the project, you will need the following tools and dependencies:
 
 **Solution:** Ensure that Docker is installed and running on your system. You can download Docker from [https://www.docker.com/](https://www.docker.com/).
 
-### Issue: CMake not found
+### Issue: KIPR libraries not found or link errors
 
-**Solution:** Ensure that CMake is installed and available in your system's PATH. You can download CMake from [https://cmake.org/](https://cmake.org/).
+**Solution:** Use the `sillyfreak/wombat-cross` image as shown; it includes the correct ARM64 toolchain and libraries. If you maintain your own image, ensure `-lkipr -lpthread -lm -lz` resolve for aarch64 within the container.
 
-### Issue: Cross-compilation toolchain not found
+### Note on mixed C/C++ sources
 
-**Solution:** Ensure that the cross-compilation toolchain (e.g., `gcc-aarch64-linux-gnu`) is installed on your system. You can install it using your system's package manager. For example, on Ubuntu, you can run:
-
-```sh
-sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
-```
+The build uses `aarch64-linux-gnu-g++` as the driver. `.c` files are compiled as C with `-x c -std=c11`; C++ sources use `-x c++ -std=c++17`. Linking is done with the C++ driver to satisfy C++ runtime dependencies.
 
 ### Issue: Build fails with missing dependencies
 
@@ -74,4 +82,19 @@ sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64
 
 **Solution:** Ensure that you have the necessary permissions to run Docker and access the project directory. You may need to run the Docker commands with `sudo` or adjust the permissions of the project directory.
 
-If you encounter any other issues or need further assistance, please refer to the project's documentation or reach out to the project maintainers.
+If you prefer CMake, a legacy `CMakeLists.txt` is present, but the Make-based flow above is simpler and aligns with the container’s quick start.
+
+## Options
+
+- --clean: removes `out/` before building, then builds fresh into `out/build`.
+- --clean-only: removes `out/` and exits without building.
+- --verbose or -v: prints the full compiler and docker commands and enables compiler verbosity.
+
+Example:
+
+```sh
+python3 build.py --clean --verbose -DDEBUG
+python3 build.py --clean-only
+```
+
+Note: The legacy CMake and custom Dockerfile flow are deprecated and no longer used.
