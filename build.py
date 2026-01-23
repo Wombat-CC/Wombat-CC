@@ -53,6 +53,11 @@ def main():
         action="store_true",
         help="Print commands and enable compiler verbosity",
     )
+    parser.add_argument(
+        "--ci",
+        action="store_true",
+        help="CI mode: run container as root (for write perms on mounted workspace)",
+    )
     # Capture any extra compiler/linker flags after a '--'
     args, extra_args = parser.parse_known_args()
 
@@ -64,6 +69,8 @@ def main():
     except Exception:
         print("Docker is required but not available on PATH.", file=sys.stderr)
         sys.exit(1)
+
+    host_arch = platform.machine().lower()
 
     # Get current directory in proper format for Docker volume mounting
     current_dir = os.getcwd()
@@ -94,17 +101,18 @@ def main():
 
     # Verify the cross C++ compiler exists inside the image
     print("Checking cross C++ toolchain in container...")
-    if not run_command(
-        [
-            "docker",
-            "run",
-            "--rm",
-            image,
-            "bash",
-            "-lc",
-            "command -v aarch64-linux-gnu-g++ && aarch64-linux-gnu-g++ --version | head -n 1",
-        ]
-    ):
+    preflight_cmd = ["docker", "run", "--rm"]
+    if args.ci:
+        preflight_cmd += ["--user", "root"]
+    if host_arch in ("arm64", "aarch64", "arm64e"):
+        preflight_cmd += ["--platform", "linux/amd64"]
+    preflight_cmd += [
+        image,
+        "bash",
+        "-lc",
+        "command -v aarch64-linux-gnu-g++ && aarch64-linux-gnu-g++ --version | head -n 1",
+    ]
+    if not run_command(preflight_cmd):
         print(
             "aarch64-linux-gnu-g++ not found in the image. Please ensure the image provides the cross C++ compiler.",
             file=sys.stderr,
@@ -176,8 +184,9 @@ aarch64-linux-gnu-g++ $c_objs $cpp_objs -o {target} -lkipr -lpthread -lm -lz {ex
 
     print("Building project inside Docker container using aarch64-linux-gnu-g++...")
     docker_cmd = ["docker", "run", "--rm"]
+    if args.ci:
+        docker_cmd += ["--user", "root"]
     # On Apple Silicon (arm64 hosts), force linux/amd64 image to suppress warnings
-    host_arch = platform.machine().lower()
     if host_arch in ("arm64", "aarch64", "arm64e"):
         docker_cmd += ["--platform", "linux/amd64"]
     docker_cmd += [

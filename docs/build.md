@@ -89,12 +89,14 @@ If you prefer CMake, a legacy `CMakeLists.txt` is present, but the Make-based fl
 - --clean: removes `out/` before building, then builds fresh into `out/build`.
 - --clean-only: removes `out/` and exits without building.
 - --verbose or -v: prints the full compiler and docker commands and enables compiler verbosity.
+- --ci: run the container as root (for CI runners where mounted workspace perms are restrictive).
 
 Example:
 
 ```sh
 python3 build.py --clean --verbose -DDEBUG
 python3 build.py --clean-only
+python3 build.py --ci
 ```
 
 Note: The legacy CMake and custom Dockerfile flow are deprecated and no longer used.

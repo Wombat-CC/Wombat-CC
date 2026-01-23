@@ -13,8 +13,8 @@ jobs:
         steps:
             - uses: actions/checkout@v3
 
-            - name: Build with build.py (Docker toolchain)
-              run: python3 build.py
+                        - name: Build with build.py (Docker toolchain)
+                            run: python3 build.py --ci
 
             - name: Create Release
               id: create_release
