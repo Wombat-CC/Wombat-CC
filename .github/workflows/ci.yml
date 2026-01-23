@@ -13,7 +13,7 @@ jobs:
         steps:
             - uses: actions/checkout@v3
 
-                        - name: Build with build.py (Docker toolchain)
+                        - name: Build with build.py Docker toolchain
                             run: python3 build.py --ci
 
             - name: Upload build artifact
