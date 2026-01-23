@@ -1,5 +1,5 @@
-#include "../include/library.h"
 #include <iostream>
+#include <kipr/wombat.h>
 
 int main()
 {
