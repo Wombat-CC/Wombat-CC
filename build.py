@@ -974,12 +974,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     docker_image = str(config.get("docker_image", "sillyfreak/wombat-cross"))
 
+    if args.ci:
+        eprint("Running in CI mode...")
+
     if not docker_available(verbose=args.verbose):
-        eprint("Docker is required but not available on PATH.")
+        eprint("Error: Docker is not available on the system PATH. Please ensure Docker is installed and running.")
         return 1
 
-    ensure_image(docker_image, verbose=args.verbose)
-    img_id = docker_image_id(docker_image, verbose=args.verbose) or ""
+    try:
+        ensure_image(docker_image, verbose=args.verbose)
+    except Exception as ex:
+        eprint(f"Error: Failed to ensure Docker image '{docker_image}'. Exception: {ex}")
+        return 1
+
+    try:
+        img_id = docker_image_id(docker_image, verbose=args.verbose) or ""
+    except Exception as ex:
+        eprint(f"Error: Failed to retrieve Docker image ID for '{docker_image}'. Exception: {ex}")
+        return 1
+
+    if not img_id:
+        eprint(f"Error: Docker image ID for '{docker_image}' could not be determined. Ensure the image is available.")
+        return 1
 
     # Output paths (host)
     dirs = config.get("directories", {}) or {}
