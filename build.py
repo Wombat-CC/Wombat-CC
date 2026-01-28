@@ -975,7 +975,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     docker_image = str(config.get("docker_image", "sillyfreak/wombat-cross"))
 
     if args.ci:
-        eprint("Running in CI mode...")
+        args.verbose = True  # Automatically enable verbose mode in CI
+        eprint("Running in CI mode with verbose output enabled...")
 
     if not docker_available(verbose=args.verbose):
         eprint(
@@ -1009,7 +1010,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     dirs = config.get("directories", {}) or {}
     out_dir = project_root / str(dirs.get("output", "out"))
     obj_root = out_dir / str(dirs.get("objects", "obj"))
-    build_dir = out_dir / str(dirs.get("build", "build"))
+    build_dir = out_dir / "build"
 
     cache_path = out_dir / ".wombat_build_cache.json"
 
