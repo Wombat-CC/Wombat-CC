@@ -60,6 +60,7 @@ def run(
     capture: bool = False,
     cwd: Optional[Path] = None,
     verbose: bool = False,
+    suppress_error_output: bool = False,
 ) -> subprocess.CompletedProcess:
     """Run a subprocess command.
 
@@ -83,12 +84,13 @@ def run(
         eprint("Command not found:", cmd[0], level="ERROR")
         raise
     except subprocess.CalledProcessError as ex:
-        if capture:
-            if ex.stdout:
-                eprint(ex.stdout.rstrip(), level="ERROR")
-            if ex.stderr:
-                eprint(ex.stderr.rstrip(), level="ERROR")
-        eprint(f"Subprocess failed: {' '.join(cmd)}", level="ERROR")
+        if not suppress_error_output:
+            if capture:
+                if ex.stdout:
+                    eprint(ex.stdout.rstrip(), level="ERROR")
+                if ex.stderr:
+                    eprint(ex.stderr.rstrip(), level="ERROR")
+            eprint(f"Subprocess failed: {' '.join(cmd)}", level="ERROR")
         raise
 
 
@@ -692,6 +694,7 @@ def docker_image_exists(image: str, verbose: bool = False) -> bool:
             check=True,
             capture=True,  # Always capture to suppress output
             verbose=False,  # Never print [CMD] for existence check
+            suppress_error_output=True,
         )
         return True
     except subprocess.CalledProcessError:
