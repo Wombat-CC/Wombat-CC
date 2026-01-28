@@ -13,9 +13,6 @@ jobs:
         steps:
             - uses: actions/checkout@v3
 
-            - name: Pull Git submodules
-              run: git submodule update --init --recursive
-
             - name: Build with build.py (Docker toolchain)
               run: python3 build.py --ci
 
