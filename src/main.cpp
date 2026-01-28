@@ -1,6 +1,5 @@
 #include <iostream>
 #include <kipr/wombat.h>
-#include "../lib/DriveTrain/include/DriveTrain.hpp"
 
 int main()
 {
