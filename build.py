@@ -24,16 +24,33 @@ import subprocess
 import sys
 from collections import deque
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 # -------------------------
 # Utility helpers
 # -------------------------
 
 
-# Modify eprint to be a no-op function to suppress extra output
-def eprint(*args: object) -> None:
-    pass
+# ANSI color codes
+_COLORS = {
+    "INFO": "\033[36m",  # Cyan
+    "WARNING": "\033[33m",  # Yellow
+    "ERROR": "\033[31m",  # Red
+    "SUCCESS": "\033[32m",  # Green
+    "RESET": "\033[0m",
+}
+
+
+def eprint(*args: object, level: str = "INFO") -> None:
+    prefix = {
+        "WARNING": "[WARNING]",
+        "ERROR": "[ERROR]",
+        "SUCCESS": "[SUCCESS]",
+        "INFO": "[INFO]",
+    }.get(level.upper(), "[INFO]")
+    color = _COLORS.get(level.upper(), "")
+    reset = _COLORS["RESET"]
+    print(f"{color}{prefix}", *args, f"{reset}", file=sys.stderr)
 
 
 def run(
@@ -48,28 +65,30 @@ def run(
 
     - Uses list-args to avoid shell injection.
     - Optionally captures stdout.
+    - By default, shows output unless capture=True.
     """
-
     if verbose:
-        eprint("[cmd]", " ".join(shlex.quote(c) for c in cmd))
+        eprint("[CMD]", " ".join(shlex.quote(c) for c in cmd), level="INFO")
 
     try:
         return subprocess.run(
             list(cmd),
             check=check,
             cwd=str(cwd) if cwd else None,
-            stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-            stderr=subprocess.PIPE if capture else subprocess.DEVNULL,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
             text=True,
         )
     except FileNotFoundError:
+        eprint("Command not found:", cmd[0], level="ERROR")
         raise
     except subprocess.CalledProcessError as ex:
         if capture:
             if ex.stdout:
-                eprint(ex.stdout.rstrip())
+                eprint(ex.stdout.rstrip(), level="ERROR")
             if ex.stderr:
-                eprint(ex.stderr.rstrip())
+                eprint(ex.stderr.rstrip(), level="ERROR")
+        eprint(f"Subprocess failed: {' '.join(cmd)}", level="ERROR")
         raise
 
 
@@ -87,7 +106,6 @@ def _strip_inline_comment(s: str) -> str:
     out: List[str] = []
     in_squote = False
     in_dquote = False
-    it = iter(range(len(s)))
     i = 0
     while i < len(s):
         ch = s[i]
@@ -286,14 +304,17 @@ def load_config(config_path: Path) -> Dict[str, Any]:
     }
 
     if not config_path.exists():
-        eprint(f"Note: {config_path} not found; using default configuration.")
+        eprint(
+            f"Config file not found: {config_path}; using default configuration.",
+            level="WARNING",
+        )
         return default_config
 
     try:
         raw = config_path.read_text(encoding="utf-8", errors="ignore")
     except Exception as ex:
-        eprint(f"Warning: could not read config {config_path}: {ex}")
-        eprint("Using default configuration.")
+        eprint(f"Could not read config {config_path}: {ex}", level="WARNING")
+        eprint("Using default configuration.", level="WARNING")
         return default_config
 
     try:
@@ -305,8 +326,8 @@ def load_config(config_path: Path) -> Dict[str, Any]:
             raise TypeError("Config root must be a mapping")
         return deep_merge(default_config, user_cfg)
     except Exception as ex:
-        eprint(f"Warning: could not parse config {config_path}: {ex}")
-        eprint("Using default configuration.")
+        eprint(f"Could not parse config {config_path}: {ex}", level="WARNING")
+        eprint("Using default configuration.", level="WARNING")
         return default_config
 
 
@@ -658,7 +679,7 @@ def needs_rebuild(
 
 def docker_available(verbose: bool = False) -> bool:
     try:
-        run(["docker", "--version"], check=True, capture=False, verbose=verbose)
+        run(["docker", "--version"], check=True, capture=not verbose, verbose=verbose)
         return True
     except Exception:
         return False
@@ -669,7 +690,7 @@ def docker_image_exists(image: str, verbose: bool = False) -> bool:
         run(
             ["docker", "image", "inspect", image],
             check=True,
-            capture=False,
+            capture=not verbose,
             verbose=verbose,
         )
         return True
@@ -681,7 +702,7 @@ def ensure_image(image: str, verbose: bool = False) -> None:
     if docker_image_exists(image, verbose=verbose):
         return
     eprint(f"Docker image '{image}' not found locally; pulling...")
-    run(["docker", "pull", image], check=True, capture=False, verbose=verbose)
+    run(["docker", "pull", image], check=True, capture=not verbose, verbose=verbose)
 
 
 def docker_image_id(image: str, verbose: bool = False) -> Optional[str]:
@@ -976,35 +997,41 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.ci:
         args.verbose = True  # Automatically enable verbose mode in CI
-        eprint("Running in CI mode with verbose output enabled...")
+        eprint("[CI MODE] Running in CI mode with verbose output enabled...")
 
-    if not docker_available(verbose=args.verbose):
-        eprint(
-            "Error: Docker is not available on the system PATH. Please ensure Docker is installed and running."
-        )
-        return 1
+        if not docker_available(verbose=args.verbose):
+            eprint(
+                "Docker is not available on the system PATH. Please ensure Docker is installed and running.",
+                level="ERROR",
+            )
+            return 1
 
-    try:
-        ensure_image(docker_image, verbose=args.verbose)
-    except Exception as ex:
-        eprint(
-            f"Error: Failed to ensure Docker image '{docker_image}'. Exception: {ex}"
-        )
-        return 1
+        try:
+            ensure_image(docker_image, verbose=args.verbose)
+        except Exception as ex:
+            eprint(
+                f"Failed to ensure Docker image '{docker_image}'. Exception: {ex}",
+                level="ERROR",
+            )
+            return 1
 
-    try:
-        img_id = docker_image_id(docker_image, verbose=args.verbose) or ""
-    except Exception as ex:
-        eprint(
-            f"Error: Failed to retrieve Docker image ID for '{docker_image}'. Exception: {ex}"
-        )
-        return 1
+        try:
+            img_id = docker_image_id(docker_image, verbose=args.verbose) or ""
+        except Exception as ex:
+            eprint(
+                f"Failed to retrieve Docker image ID for '{docker_image}'. Exception: {ex}",
+                level="ERROR",
+            )
+            return 1
 
-    if not img_id:
-        eprint(
-            f"Error: Docker image ID for '{docker_image}' could not be determined. Ensure the image is available."
-        )
-        return 1
+        if not img_id:
+            eprint(
+                f"Docker image ID for '{docker_image}' could not be determined. Ensure the image is available.",
+                level="ERROR",
+            )
+            return 1
+    else:
+        img_id = ""
 
     # Output paths (host)
     dirs = config.get("directories", {}) or {}
@@ -1036,7 +1063,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Gather sources
     src_dir = project_root / str(dirs.get("source", "src"))
     if not src_dir.is_dir():
-        eprint(f"Source directory not found: {src_dir}")
+        eprint(f"Source directory not found: {src_dir}", level="ERROR")
         return 1
 
     project_sources = tuple(
@@ -1079,7 +1106,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sorted((*project_sources, *sub_sources), key=lambda p: p.as_posix())
     )
     if not all_sources:
-        eprint("No source files found.")
+        eprint("No source files found.", level="ERROR")
         return 1
 
     # Build include dirs (relative to project root, as POSIX, for container)
@@ -1246,7 +1273,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # Fast path: nothing to do
     if not compile_units and not needs_link:
-        print(f"Up to date: {out_bin_abs}")
+        color = _COLORS["SUCCESS"]
+        reset = _COLORS["RESET"]
+        print(f"{color}[SUCCESS] Up to date: {out_bin_abs}{reset}")
         return 0
 
     # Emit the bash build script into the workspace (so docker can execute it).
@@ -1296,20 +1325,37 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # using the same relative path works.
 
     if args.verbose:
-        eprint("Build plan:")
-        eprint(f"  Sources total: {len(all_sources)}")
-        eprint(f"  To compile:    {len(compile_units)}")
-        eprint(f"  To link:       {needs_link}")
-        eprint(f"  Jobs:          {jobs}")
-        eprint(f"  Output:        {out_bin_rel}")
+        eprint("Build plan:", level="INFO")
+        eprint(f"  Sources total: {len(all_sources)}", level="INFO")
+        eprint(f"  To compile:    {len(compile_units)}", level="INFO")
+        eprint(f"  To link:       {needs_link}", level="INFO")
+        eprint(f"  Jobs:          {jobs}", level="INFO")
+        eprint(f"  Output:        {out_bin_rel}", level="INFO")
 
     try:
-        run(docker_cmd, check=True, capture=False, verbose=args.verbose)
+        if args.verbose:
+            run(docker_cmd, check=True, capture=False, verbose=True)
+        else:
+            # Suppress docker output unless error
+            try:
+                run(docker_cmd, check=True, capture=True, verbose=False)
+            except subprocess.CalledProcessError as ex:
+                color = _COLORS["ERROR"]
+                reset = _COLORS["RESET"]
+                print(
+                    f"{color}[ERROR] Docker build failed. Output:{reset}",
+                    file=sys.stderr,
+                )
+                if ex.stdout:
+                    print(f"{color}[ERROR] {ex.stdout}{reset}", file=sys.stderr)
+                if ex.stderr:
+                    print(f"{color}[ERROR] {ex.stderr}{reset}", file=sys.stderr)
+                raise
     except FileNotFoundError:
-        eprint("Docker executable not found on PATH.")
+        eprint("Docker executable not found on PATH.", level="ERROR")
         return 1
     except subprocess.CalledProcessError:
-        eprint("Build failed. See errors above.")
+        eprint("Build failed. See errors above.", level="ERROR")
         return 1
 
     # Update cache
@@ -1324,10 +1370,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         save_cache(cache_path, cache_new)
     except Exception as ex:
         if args.verbose:
-            eprint(f"Warning: could not write cache file: {ex}")
+            eprint(f"Could not write cache file: {ex}", level="WARNING")
 
-    print("Build completed successfully.")
-    print(f"Executable location: {out_bin_abs}")
+    eprint("Build completed successfully.", level="SUCCESS")
+    color = _COLORS["SUCCESS"]
+    reset = _COLORS["RESET"]
+    print(f"{color}[SUCCESS] Executable location: {out_bin_abs}{reset}\n")
     return 0
 
 
