@@ -1015,14 +1015,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
             return 1
 
-        try:
-            img_id = docker_image_id(docker_image, verbose=args.verbose) or ""
-        except Exception as ex:
-            eprint(
-                f"Failed to retrieve Docker image ID for '{docker_image}'. Exception: {ex}",
-                level="ERROR",
-            )
-            return 1
+        # Retry docker_image_id up to 5 times after pulling, in case of race
+        import time
+
+        img_id = ""
+        for attempt in range(5):
+            try:
+                img_id = docker_image_id(docker_image, verbose=args.verbose) or ""
+                if img_id:
+                    break
+            except Exception as ex:
+                if attempt == 4:
+                    eprint(
+                        f"Failed to retrieve Docker image ID for '{docker_image}'. Exception: {ex}",
+                        level="ERROR",
+                    )
+                    return 1
+            time.sleep(1)
 
         if not img_id:
             eprint(
