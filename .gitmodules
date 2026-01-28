@@ -1,0 +1,3 @@
+[submodule "lib/DriveTrain"]
+	path = lib/DriveTrain
+	url = https://github.com/cdenihan/Wombat-DriveTrain.git
