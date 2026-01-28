@@ -690,8 +690,8 @@ def docker_image_exists(image: str, verbose: bool = False) -> bool:
         run(
             ["docker", "image", "inspect", image],
             check=True,
-            capture=not verbose,
-            verbose=verbose,
+            capture=True,  # Always capture to suppress output
+            verbose=False,  # Never print [CMD] for existence check
         )
         return True
     except subprocess.CalledProcessError:
