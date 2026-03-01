@@ -1,239 +1,148 @@
 # Build Instructions
 
-This document provides detailed instructions on how to build the project.
+## Overview
 
-## Build System
+Project XBOT uses **Zig** as both its build system and cross-compiler. The KIPR SDK (headers + pre-built `libkipr.so`) is **fetched automatically** from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) repository at build time using a **pure-Zig extraction tool** — no shell commands, no platform-specific tools.
 
-The recommended build path is a direct g++ invocation inside the published Docker image `sillyfreak/wombat-cross` (which contains the full cross toolchain and KIPR libraries). This works on macOS, Windows, and Linux with Docker installed.
+This means `zig build` works identically on **Windows**, **macOS**, and **Linux**.
 
-## Configuration
+## Prerequisites
 
-The build system uses configuration files in the `configs/` directory to customize compiler flags, optimization levels, and other build options. By default, the build system uses `configs/config.dev.yaml` for development builds.
+### Option A: Install Zig directly (recommended)
 
-### Pre-configured Build Profiles
+Download Zig 0.15.2 or later from [ziglang.org/download](https://ziglang.org/download/) and add it to your `PATH`. Works on all platforms (Windows, macOS, Linux).
 
-The project includes three pre-configured build profiles in the `configs/` directory:
-
-- **config.dev.yaml**: Development configuration (DEFAULT)
-    - Debug optimization (`-Og`) optimized for debugging experience
-    - Debug symbols enabled for debugging with gdb
-    - Extra warnings (`-Wall -Wextra -Wpedantic`) to catch issues early
-    - Best for active development and testing
-
-- **config.prod.yaml**: Production configuration
-    - Aggressive optimization (`-O3`) for maximum performance
-    - No debug symbols for smaller binary size
-    - Essential warnings only (`-Wall`)
-    - Best for final builds and deployment
-
-- **config.example.yaml**: Example configuration template
-    - Comprehensive documentation of all available options
-    - Copy and customize this file for your own configurations
-
-### Using Build Profiles
-
-**Default development build (uses config.dev.yaml):**
+### Option B: Nix + direnv (Linux / macOS only)
 
 ```sh
-python3 build.py
+cd Project-XBOT
+direnv allow   # activates the Nix shell automatically
 ```
 
-**Production build:**
+## Building
+
+### Default Build (Debug, aarch64-linux)
 
 ```sh
-python3 build.py --config configs/config.prod.yaml
+zig build
 ```
 
-**Custom configuration:**
+Output: `zig-out/bin/botball_user_program`
+
+### Production Build
 
 ```sh
-python3 build.py --config configs/my-custom-config.yaml
+zig build -Doptimize=ReleaseFast
 ```
 
-### Creating a Custom Configuration
+### All Optimization Modes
 
-1. Copy an existing configuration or the example:
+| Flag                       | Description                              |
+|----------------------------|------------------------------------------|
+| *(none)*                   | Debug — fast compile, safety checks      |
+| `-Doptimize=ReleaseSafe`   | Optimized with safety checks             |
+| `-Doptimize=ReleaseFast`   | Maximum performance                      |
+| `-Doptimize=ReleaseSmall`  | Optimized for binary size                |
 
-    ```sh
-    cp configs/config.dev.yaml configs/my-config.yaml
-    # or
-    cp configs/config.example.yaml configs/my-config.yaml
-    ```
+## How It Works
 
-2. Edit your new configuration file to customize build settings.
+On the first build, the Zig package manager downloads the pinned wombat-os release tarball (cached after first fetch). Then:
 
-3. Use it with the `--config` flag:
+1. **`build/extract_kipr.zig`** is compiled for the host and executed
+2. It parses the `ar` archive format, decompresses gzip, and extracts the tar — all in pure Zig
+3. Headers land in the build cache at `usr/include/kipr/`; `libkipr.so` at `usr/lib/`
+4. Your source files are cross-compiled to `aarch64-linux-gnu`
+5. The binary is linked against `libkipr.so` for symbol resolution
 
-    ```sh
-    python3 build.py --config configs/my-config.yaml
-    ```
+At runtime on the Wombat, `libkipr.so` is already installed at `/usr/lib/libkipr.so`.
 
-### Configuration Options
+### Static vs Dynamic Linking
 
-The configuration file supports the following options:
+The build is as static as possible. The only dynamic dependencies are the ones required by the Wombat runtime:
 
-- **docker_image**: Docker image to use for cross-compilation (default: `sillyfreak/wombat-cross`)
+| Library | Linking | Why |
+|---------|---------|-----|
+| Zig standard library | **Static** | Compiled into the binary |
+| libc++ (C++ runtime) | **Static** | Only included when `.cpp` files are present; omitted in pure-Zig mode |
+| `libkipr.so` | Dynamic | Pre-built shared library on the Wombat |
+| `libc.so.6` / `libpthread.so.0` | Dynamic | glibc — required by `libkipr.so` on the Wombat |
 
-- **compiler**:
-    - **cross_compiler**: Cross-compiler executable (default: `aarch64-linux-gnu-g++`)
-    - **flags**: Compiler warning and other flags (default: `-Wall`)
-    - **optimization**: Optimization level `-Og` (debug), `-O0`, `-O1`, `-O2`, `-O3`, `-Os`, or `-Ofast` (default: `-O2`)
-    - **debug**: Include debug symbols (default: `true`)
-    - **c_standard**: C language standard, e.g., `c11`, `c17` (default: `c11`)
-    - **cpp_standard**: C++ language standard, e.g., `c++17`, `c++20` (default: `c++17`)
+In pure-Zig mode (no `.cpp` files), the binary has **zero** static C++ overhead.
 
-- **linker**:
-    - **libraries**: Space-separated library names without `-l` prefix (default: `kipr pthread m z`)
-    - **flags**: Additional linker flags (default: empty)
+## Language Support
 
-- **directories**:
-    - **source**: Source directory (default: `src`)
-    - **include**: Include directory (default: `include`)
-    - **output**: Output directory (default: `out`)
-    - **objects**: Object files subdirectory (default: `obj`)
-    - **build**: Build artifacts subdirectory (default: `build`)
+### Zig (default)
 
-- **output_name**: Name of the output executable (default: `botball_user_program`)
+Write your code in `src/main.zig`. KIPR bindings are generated at compile time via `@cImport`:
 
-- **extra_args**: Additional compiler/linker arguments as a list (default: `[]`)
+```zig
+const wombat = @cImport(@cInclude("kipr/wombat.h"));
 
-### Example Configurations
-
-**Debug build:**
-
-```yaml
-compiler:
-    optimization: "-Og"
-    debug: true
-    flags: "-Wall -Wextra"
+pub fn main() void {
+    wombat.motor(0, 100);
+    wombat.msleep(1000);
+    wombat.ao();
+}
 ```
 
-**Release build:**
+The bindings update automatically when the SDK version changes — no manual maintenance.
 
-```yaml
-compiler:
-    optimization: "-O3"
-    debug: false
-    flags: "-Wall"
-```
+### C / C++
 
-**Custom preprocessor defines:**
+Delete `src/main.zig` and add `.c` / `.cpp` / `.cc` / `.cxx` files to `src/`. They are discovered and compiled automatically.
 
-```yaml
-extra_args:
-    - "-DDEBUG"
-    - "-DVERSION=1.0"
-```
+- `.c` files are compiled as C11
+- `.cpp`, `.cc`, `.cxx` files are compiled as C++17
 
-## Required Tools and Dependencies
+Use `#include <kipr/wombat.h>` to access the KIPR API.
 
-To build the project, you will need:
+### Mixed (Zig + C/C++)
 
-- Docker
-- Python 3 (no external packages required)
-- Internet access to pull `sillyfreak/wombat-cross`
+When `src/main.zig` exists, it becomes the entry point. Any C/C++ files in `src/` are still compiled and linked alongside the Zig code — useful for gradual migration or calling C helpers.
 
-## Build Steps
-
-1. Clone the repository:
-
-    ```sh
-    git clone https://github.com/GMHS-BotBall-Team-504/Project-X.git
-    cd Project-X
-    ```
-
-2. Create the build directory:
-
-    ```sh
-    mkdir -p out/build
-    ```
-
-3. Build using the helper script (cross-platform):
-
-    ```sh
-    python3 build.py
-    ```
-
-4. Alternatively, run Docker manually (Unix shells):
-
-    ```sh
-    docker run --rm -v "$(pwd)":/work -w /work \
-      sillyfreak/wombat-cross bash -lc \
-      'mkdir -p out/build && aarch64-linux-gnu-g++ -Wall -O2 -g -Iinclude \
-        -x c -std=c11 src/*.c -x c++ -std=c++17 src/*.cc src/*.cpp src/*.cxx \
-        -o out/build/botball_user_program -lkipr -lpthread -lm -lz'
-    ```
-
-5. On Windows (PowerShell):
-
-    ```powershell
-    docker run --rm -v ${PWD}:/work -w /work `
-      sillyfreak/wombat-cross bash -lc `
-      "mkdir -p out/build && aarch64-linux-gnu-g++ -Wall -O2 -g -Iinclude `
-        -x c -std=c11 src/*.c -x c++ -std=c++17 src/*.cc src/*.cpp src/*.cxx `
-        -o out/build/botball_user_program -lkipr -lpthread -lm -lz"
-    ```
-
-6. The built executable will be located in the `out/build` directory:
-
-    ```sh
-    ls out/build/botball_user_program
-    ```
-
-## Common Build Issues and Troubleshooting
-
-### Issue: Docker not found
-
-**Solution:** Ensure that Docker is installed and running on your system. You can download Docker from [https://www.docker.com/](https://www.docker.com/).
-
-### Issue: KIPR libraries not found or link errors
-
-**Solution:** Use the `sillyfreak/wombat-cross` image as shown; it includes the correct ARM64 toolchain and libraries. If you maintain your own image, ensure `-lkipr -lpthread -lm -lz` resolve for aarch64 within the container.
-
-### Note on mixed C/C++ sources
-
-The build uses `aarch64-linux-gnu-g++` as the driver. `.c` files are compiled as C with `-x c -std=c11`; C++ sources use `-x c++ -std=c++17`. Linking is done with the C++ driver to satisfy C++ runtime dependencies.
-
-### Issue: Build fails with missing dependencies
-
-**Solution:** Ensure that all required dependencies are installed. Refer to the "Required Tools and Dependencies" section above for a list of dependencies.
-
-### Issue: Build fails with permission denied errors
-
-**Solution:** Ensure that you have the necessary permissions to run Docker and access the project directory. You may need to run the Docker commands with `sudo` or adjust the permissions of the project directory.
-
-If you prefer CMake, a legacy `CMakeLists.txt` is present, but the Make-based flow above is simpler and aligns with the container’s quick start.
-
-## Options
-
-- `--clean`: removes `out/` before building, then builds fresh into `out/build`.
-- `--clean-only`: removes `out/` and exits without building.
-- `--verbose` or `-v`: prints the full compiler and docker commands and enables compiler verbosity.
-- `--ci`: run the container as root (for CI runners where mounted workspace perms are restrictive).
-- `--config <path>`: specify a custom configuration file path (default: `configs/config.dev.yaml`).
-
-You can still pass extra compiler/linker flags after `--`:
-
-Example:
+## Updating the KIPR SDK
 
 ```sh
-# Default development build (uses configs/config.dev.yaml)
-python3 build.py
-
-# Development build with verbose output
-python3 build.py --verbose
-
-# Production build with clean
-python3 build.py --config configs/config.prod.yaml --clean
-
-# Development build with custom preprocessor defines
-python3 build.py -- -DDEBUG -DVERSION=1.0
-
-# Clean only
-python3 build.py --clean-only
-
-# CI build (production)
-python3 build.py --config configs/config.prod.yaml --ci
+zig fetch --save=wombat_os https://github.com/kipr/wombat-os/archive/refs/tags/<NEW_TAG>.tar.gz
 ```
 
-Note: The legacy CMake and custom Dockerfile flow are deprecated and no longer used.
+This updates the URL and content hash in `build.zig.zon`.
+
+## GitHub Actions
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| CI | Push to `main`, pull requests | Builds with ReleaseFast, uploads artifact |
+| Release | Push `v*` tag | Builds with ReleaseFast, creates GitHub Release |
+
+## Troubleshooting
+
+### First build is slow
+
+The first build downloads the wombat-os tarball (~50 MB). Subsequent builds use the Zig package cache.
+
+### Build fails with "Could not open source directory"
+
+Ensure `src/` exists and contains at least one source file (`.zig`, `.c`, `.cpp`, `.cc`, or `.cxx`).
+
+### Zig not found
+
+Install Zig from [ziglang.org/download](https://ziglang.org/download/) or use `nix develop`.
+
+### "undefined symbol" errors
+
+The function may not exist in the current libwallaby version. Update the SDK with `zig fetch --save=wombat_os …`.
+
+### Windows: "use initWithAllocator instead"
+
+If you see this error, you are running an older version of the extractor. Pull the latest code — the build tools use `argsWithAllocator` for cross-platform arg parsing.
+
+### Windows: installing Zig
+
+The recommended way to install Zig on Windows is via [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+```powershell
+winget install zig.zig
+```
+
+Alternatively, download the `.zip` from [ziglang.org/download](https://ziglang.org/download/) and add the folder to your `PATH`.

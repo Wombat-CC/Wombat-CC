@@ -1,0 +1,25 @@
+// Project XBOT — Zig entry point
+//
+// The KIPR bindings are generated automatically from the C headers at compile
+// time via @cImport.  As libwallaby evolves, these bindings update with it —
+// no manual wrapper maintenance required.
+
+const std = @import("std");
+
+/// Import the full KIPR / libwallaby C API.  Every function, type, and
+/// constant from <kipr/wombat.h> is available under this namespace.
+const wombat = @cImport(@cInclude("kipr/wombat.h"));
+
+pub fn main() void {
+    std.debug.print("[INIT] Welcome to Project XBOT (Zig)\n", .{});
+    std.debug.print("[INFO] Using KIPR libwallaby v{s}\n", .{wombat.KIPR_VERSION});
+
+    // ── Example: drive motors forward for 1 second, then stop ────────
+    // wombat.motor(0, 100);   // motor 0 at 100% power
+    // wombat.motor(1, 100);   // motor 1 at 100% power
+    // wombat.msleep(1000);    // wait 1 second
+    // wombat.ao();            // all off
+
+    std.debug.print("[STOP] Shutting down\n", .{});
+    wombat.ao();
+}
