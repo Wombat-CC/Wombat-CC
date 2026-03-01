@@ -27,7 +27,6 @@ pub fn build(b: *std.Build) void {
     });
 
     const extract_step = b.addRunArtifact(extractor);
-    extract_step.step.description = "Extract KIPR SDK (cached)";
     extract_step.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
     const sdk_root = extract_step.addOutputDirectoryArg("kipr_sdk");
 
