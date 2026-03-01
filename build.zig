@@ -42,14 +42,21 @@ pub fn build(b: *std.Build) void {
     };
 
     // ── User executable ──────────────────────────────────────────────
+    // Compile any C++ source files in src/
+    const cpp_files = collectSourceFiles(b, "src", .cpp);
+    const has_cpp = cpp_files.len > 0;
+
     const exe = b.addExecutable(.{
         .name = "botball_user_program",
         .root_module = b.createModule(.{
             .root_source_file = if (has_zig_main) b.path("src/main.zig") else null,
             .target = target,
             .optimize = optimize,
+            // libc is always needed (libkipr.so depends on it).
+            // libc++ is only linked when C++ source files are present,
+            // keeping pure-Zig builds as static as possible.
             .link_libc = true,
-            .link_libcpp = true,
+            .link_libcpp = if (has_cpp) true else null,
         }),
     });
 
@@ -69,9 +76,8 @@ pub fn build(b: *std.Build) void {
         });
     }
 
-    // Compile any C++ source files in src/
-    const cpp_files = collectSourceFiles(b, "src", .cpp);
-    if (cpp_files.len > 0) {
+    // Link C++ source files (already collected above)
+    if (has_cpp) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),
             .files = cpp_files,

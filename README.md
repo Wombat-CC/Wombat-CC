@@ -8,9 +8,9 @@ Cross-compilation build system for the [KIPR Wombat](https://www.kipr.org/kipr/h
 
 | Platform | Requirement |
 |----------|-------------|
-| **Windows** | [Zig ≥ 0.15](https://ziglang.org/download/) |
-| **macOS** | [Zig ≥ 0.15](https://ziglang.org/download/) |
-| **Linux** | [Zig ≥ 0.15](https://ziglang.org/download/) |
+| **Windows** | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **macOS** | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **Linux** | [Zig 0.15.2+](https://ziglang.org/download/) |
 
 One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https://nixos.org/download.html)** + **[direnv](https://direnv.net/)** for a fully reproducible environment.
 

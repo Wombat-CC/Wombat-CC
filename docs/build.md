@@ -10,7 +10,7 @@ This means `zig build` works identically on **Windows**, **macOS**, and **Linux*
 
 ### Option A: Install Zig directly (recommended)
 
-Download Zig ≥ 0.15 from [ziglang.org/download](https://ziglang.org/download/) and add it to your `PATH`. Works on all platforms.
+Download Zig 0.15.2 or later from [ziglang.org/download](https://ziglang.org/download/) and add it to your `PATH`. Works on all platforms (Windows, macOS, Linux).
 
 ### Option B: Nix + direnv (Linux / macOS only)
 
@@ -54,7 +54,20 @@ On the first build, the Zig package manager downloads the pinned wombat-os relea
 4. Your source files are cross-compiled to `aarch64-linux-gnu`
 5. The binary is linked against `libkipr.so` for symbol resolution
 
-At runtime on the Wombat, `libkipr.so` is already installed at `/usr/lib/libkipr.so`. The C++ standard library is statically linked by Zig.
+At runtime on the Wombat, `libkipr.so` is already installed at `/usr/lib/libkipr.so`.
+
+### Static vs Dynamic Linking
+
+The build is as static as possible. The only dynamic dependencies are the ones required by the Wombat runtime:
+
+| Library | Linking | Why |
+|---------|---------|-----|
+| Zig standard library | **Static** | Compiled into the binary |
+| libc++ (C++ runtime) | **Static** | Only included when `.cpp` files are present; omitted in pure-Zig mode |
+| `libkipr.so` | Dynamic | Pre-built shared library on the Wombat |
+| `libc.so.6` / `libpthread.so.0` | Dynamic | glibc — required by `libkipr.so` on the Wombat |
+
+In pure-Zig mode (no `.cpp` files), the binary has **zero** static C++ overhead.
 
 ## Language Support
 
@@ -119,3 +132,17 @@ Install Zig from [ziglang.org/download](https://ziglang.org/download/) or use `n
 ### "undefined symbol" errors
 
 The function may not exist in the current libwallaby version. Update the SDK with `zig fetch --save=wombat_os …`.
+
+### Windows: "use initWithAllocator instead"
+
+If you see this error, you are running an older version of the extractor. Pull the latest code — the build tools use `argsWithAllocator` for cross-platform arg parsing.
+
+### Windows: installing Zig
+
+The recommended way to install Zig on Windows is via [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+
+```powershell
+winget install zig.zig
+```
+
+Alternatively, download the `.zip` from [ziglang.org/download](https://ziglang.org/download/) and add the folder to your `PATH`.

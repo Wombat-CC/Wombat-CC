@@ -54,7 +54,9 @@ fn findDataTar(reader: *std.Io.Reader) !ArEntry {
 }
 
 pub fn main() !void {
-    var args = std.process.args();
+    // Use argsWithAllocator for cross-platform support (required on Windows).
+    var args = try std.process.argsWithAllocator(std.heap.page_allocator);
+    defer args.deinit();
     _ = args.next(); // argv[0]
     const deb_path = args.next() orelse return error.MissingDebArg;
     const out_path = args.next() orelse return error.MissingOutArg;
