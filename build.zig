@@ -27,6 +27,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const extract_step = b.addRunArtifact(extractor);
+    extract_step.step.description = "Extract KIPR SDK (cached)";
     extract_step.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
     const sdk_root = extract_step.addOutputDirectoryArg("kipr_sdk");
 
@@ -98,6 +99,9 @@ pub fn build(b: *std.Build) void {
         const run_step = b.step("run", "Run the executable");
         run_step.dependOn(&run_cmd.step);
     }
+
+    const clean_step = b.step("clean", "Remove build artifacts and cached SDK");
+    clean_step.makeFn = cleanArtifacts;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -152,4 +156,23 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
         .c_files = c_files.toOwnedSlice(b.allocator) catch &.{},
         .cpp_files = cpp_files.toOwnedSlice(b.allocator) catch &.{},
     };
+}
+
+fn cleanArtifacts(step: *std.Build.Step, progress: *std.Progress.Node) !void {
+    _ = progress;
+    const b = step.owner;
+    var cwd = std.fs.cwd();
+    const paths = [_][]const u8{
+        "zig-out",
+        "zig-cache",
+    };
+
+    for (paths) |path| {
+        cwd.deleteTree(path) catch |err| switch (err) {
+            error.FileNotFound => {},
+            else => return err,
+        };
+    }
+
+    _ = b; // unused for now; reserved for future cache-aware cleanups
 }

@@ -24,6 +24,56 @@ const ArEntry = struct {
     size: u64,
 };
 
+const Stamp = struct {
+    size: u64,
+    mtime: i128,
+};
+
+fn fileExists(dir: *std.fs.Dir, path: []const u8) bool {
+    return dir.access(path, .{}) catch false;
+}
+
+fn loadStamp(dir: *std.fs.Dir) !?Stamp {
+    const file = dir.openFile(".kipr-stamp", .{}) catch |err| switch (err) {
+        error.FileNotFound => return null,
+        else => return err,
+    };
+    defer file.close();
+
+    var buf: [128]u8 = undefined;
+    const n = try file.readAll(&buf);
+    const trimmed = std.mem.trim(u8, buf[0..n], " \t\r\n");
+
+    var it = std.mem.splitScalar(u8, trimmed, ' ');
+    const size_str = it.next() orelse return null;
+    const mtime_str = it.next() orelse return null;
+
+    const size = std.fmt.parseInt(u64, size_str, 10) catch return null;
+    const mtime = std.fmt.parseInt(i128, mtime_str, 10) catch return null;
+
+    return Stamp{ .size = size, .mtime = mtime };
+}
+
+fn writeStamp(dir: *std.fs.Dir, stamp: Stamp) !void {
+    var file = try dir.createFile(".kipr-stamp", .{ .truncate = true });
+    defer file.close();
+    try file.writer().print("{d} {d}\n", .{ stamp.size, stamp.mtime });
+}
+
+fn reuseIfCurrent(out_path: []const u8, expected: Stamp) !bool {
+    var dir = std.fs.cwd().openDir(out_path, .{}) catch return false;
+    defer dir.close();
+
+    const stamp = try loadStamp(&dir) orelse return false;
+    if (stamp.size != expected.size or stamp.mtime != expected.mtime) return false;
+
+    if (!fileExists(&dir, "usr/include/kipr/wombat.h")) return false;
+    if (!fileExists(&dir, "usr/lib/libkipr.so")) return false;
+
+    std.log.info("Reusing cached KIPR SDK at {s}", .{out_path});
+    return true;
+}
+
 /// Walk the ar archive and return the first member whose name starts with
 /// "data.tar" (the payload inside a .deb package).
 fn findDataTar(reader: *std.Io.Reader) !ArEntry {
@@ -61,6 +111,19 @@ pub fn main() !void {
     const deb_path = args.next() orelse return error.MissingDebArg;
     const out_path = args.next() orelse return error.MissingOutArg;
 
+    const deb_stat = try std.fs.cwd().statFile(deb_path);
+    const expected_stamp = Stamp{
+        .size = deb_stat.size,
+        .mtime = deb_stat.mtime,
+    };
+
+    if (try reuseIfCurrent(out_path, expected_stamp)) return;
+
+    std.fs.cwd().deleteTree(out_path) catch |err| switch (err) {
+        error.FileNotFound => {},
+        else => return err,
+    };
+
     // Open the .deb file
     const deb_file = try std.fs.cwd().openFile(deb_path, .{});
     defer deb_file.close();
@@ -83,10 +146,13 @@ pub fn main() !void {
     var out_dir = try std.fs.cwd().makeOpenPath(out_path, .{});
     defer out_dir.close();
 
+    std.log.info("Extracting KIPR SDK to {s}", .{out_path});
+
     // Extract tar — strip_components=1 removes the leading "./"
     try tar.pipeToFileSystem(out_dir, &decompressor.reader, .{
         .strip_components = 1,
     });
 
     if (decompressor.err) |err| return err;
+    try writeStamp(&out_dir, expected_stamp);
 }
