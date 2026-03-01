@@ -8,6 +8,8 @@ int main()
     std::cout << "[INFO]" << " " << "DUE TO REPOSITORY ACCESS RESTRICTIONS, CERTAIN SUBMODULES MAY BE INACCESSIBLE" << std::endl;
     std::cout << "[INFO]" << " " << "PLEASE ENSURE ALL REQUIRED SUBMODULES ARE PROPERLY INITIALIZED" << std::endl;
     std::cout << "[STOP]" << " " << "SHUTTING DOWN SYSTEM" << std::endl;
+    
+    ao();
 
     return 0;
 }
