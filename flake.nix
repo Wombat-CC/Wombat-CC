@@ -3,6 +3,10 @@
   # A helpful description of your flake
   description = "Project X-Bot Development Environment";
 
+  nixConfig = {
+    experimental-features = [ "nix-command" "flakes" ];
+  };
+
   # Flake inputs
   inputs = {
     flake-schemas.url = "https://flakehub.com/f/DeterminateSystems/flake-schemas/*";
