@@ -22,7 +22,7 @@ direnv allow   # activates the Nix shell automatically
 
 ## Building
 
-### Default Build (Debug, aarch64-linux)
+### Default Build (ReleaseFast, aarch64-linux)
 
 ```sh
 zig build
@@ -30,10 +30,10 @@ zig build
 
 Output: `zig-out/bin/botball_user_program`
 
-### Production Build
+### Debug Build
 
 ```sh
-zig build -Doptimize=ReleaseFast
+zig build -Doptimize=Debug
 ```
 
 ### Clean
@@ -48,9 +48,10 @@ Removes `zig-out/`, `zig-cache/`, and any extracted KIPR SDK cache created by th
 
 | Flag                       | Description                              |
 |----------------------------|------------------------------------------|
-| *(none)*                   | Debug — fast compile, safety checks      |
+| *(none)*                   | ReleaseFast — maximum performance        |
+| `-Doptimize=Debug`         | Debug — fast compile, safety checks      |
 | `-Doptimize=ReleaseSafe`   | Optimized with safety checks             |
-| `-Doptimize=ReleaseFast`   | Maximum performance                      |
+| `-Doptimize=ReleaseFast`   | Maximum performance (explicit)           |
 | `-Doptimize=ReleaseSmall`  | Optimized for binary size                |
 
 ## How It Works
