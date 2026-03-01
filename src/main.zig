@@ -22,5 +22,4 @@ pub fn main() void {
 
     std.debug.print("[STOP] Shutting down\n", .{});
     wombat.ao();
-    wombat.ao();
 }
