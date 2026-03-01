@@ -108,10 +108,10 @@ pub fn build(b: *std.Build) void {
     // ── Validate source set ───────────────────────────────────────────
     if (!has_zig_main and c_files.len == 0 and cpp_files.len == 0) {
         std.debug.print(
-            \\error: no source files found in src/.
+            \\error: no executable entry point found in src/.
             \\       Add at least one of:
-            \\         src/main.zig          (Zig entry point)
-            \\         src/*.c / *.cpp / *.cc / *.cxx  (C/C++ sources)
+            \\         src/main.zig                         (Zig entry point)
+            \\         src/*.c / *.cpp / *.cc / *.cxx      (C/C++ sources)
             \\
         , .{});
         std.process.exit(1);
