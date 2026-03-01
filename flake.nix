@@ -28,6 +28,7 @@
           # Pinned packages available in the environment
           packages = with pkgs; [
             zig
+            zls
             git
             nixpkgs-fmt
           ];
