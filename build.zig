@@ -37,7 +37,11 @@ pub fn build(b: *std.Build) void {
 
     // --- Check if user wants to write in Zig ---
     const has_zig_main = blk: {
-        std.fs.cwd().access("src/main.zig", .{}) catch break :blk false;
+        std.fs.cwd().access("src/main.zig", .{}) catch |err| {
+            if (err != error.FileNotFound)
+                std.log.warn("Could not access src/main.zig: {}; falling back to C/C++ mode", .{err});
+            break :blk false;
+        };
         break :blk true;
     };
 
