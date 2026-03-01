@@ -11,13 +11,9 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    // Default optimization is Debug. Override with: zig build -Doptimize=<mode>
-    //   Debug        — best for development (fast compile, safety checks)
-    //   ReleaseSafe  — optimized with safety checks
-    //   ReleaseFast  — maximum performance (recommended for production)
-    //   ReleaseSmall — optimized for binary size
     const optimize = b.standardOptimizeOption(.{});
 
+    // --- User executable ---
     const exe = b.addExecutable(.{
         .name = "botball_user_program",
         .root_module = b.createModule(.{
@@ -28,10 +24,15 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // User include path (local headers and libwallaby headers)
+    // Real libwallaby headers from the KIPR Wombat OS image
     exe.addIncludePath(b.path("include"));
 
-    // Discover and compile C source files from src/
+    // Pre-built libkipr.so from the KIPR Wombat OS image
+    exe.addLibraryPath(b.path("lib"));
+    exe.addRPath(.{ .cwd_relative = "/usr/lib" });
+    exe.linkSystemLibrary("kipr");
+
+    // Discover and compile user source files from src/
     const c_files = collectSourceFiles(b, "src", .c);
     const cpp_files = collectSourceFiles(b, "src", .cpp);
 
@@ -43,7 +44,6 @@ pub fn build(b: *std.Build) void {
         });
     }
 
-    // Discover and compile C++ source files from src/
     if (cpp_files.len > 0) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),
