@@ -10,13 +10,7 @@ pub fn build(b: *std.Build) void {
             .abi = .gnu,
         },
     });
-    const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size") orelse .ReleaseFast;
-    std.log.info("Build target: {s}-{s}-{s}, optimize: {s}", .{
-        @tagName(target.result.cpu.arch),
-        @tagName(target.result.os.tag),
-        @tagName(target.result.abi),
-        @tagName(optimize),
-    });
+    const optimize = b.standardOptimizeOption(.{});
 
     // ── Extract KIPR SDK (cross-platform, pure Zig) ──────────────────
     // Compiles a small host-native tool that unpacks the headers and
@@ -174,9 +168,17 @@ fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !v
     };
 
     for (paths) |path| {
-        cwd.deleteTree(path) catch {
-            std.log.info("Clean: {s} (not present)", .{path});
-            continue;
+        cwd.deleteTree(path) catch |err| {
+            switch (err) {
+                error.FileNotFound => {
+                    std.log.info("Clean: {s} (not present)", .{path});
+                    continue;
+                },
+                else => {
+                    std.log.err("Clean: failed to remove {s}: {s}", .{ path, @errorName(err) });
+                    return err;
+                },
+            }
         };
         std.log.info("Clean: removed {s}", .{path});
     }

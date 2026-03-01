@@ -17,11 +17,11 @@ One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https
 ### Build
 
 ```sh
-# Production build (ReleaseFast, default)
+# Default build (Debug)
 zig build
 
-# Debug build
-zig build -Doptimize=Debug
+# Production build (ReleaseFast)
+zig build -Doptimize=ReleaseFast
 
 # Clean build outputs and cached SDK
 zig build clean
@@ -77,7 +77,7 @@ Delete `src/main.zig` and place `.c`, `.cpp`, `.cc`, or `.cxx` files in `src/`. 
 5. **The binary** links against `libkipr.so` (already installed on every Wombat at `/usr/lib/libkipr.so`)
 
 No KIPR files are committed to this repository. Everything is fetched and cached by the Zig package manager.
-Build output clearly reports whether the cached SDK is being reused or freshly extracted.
+The SDK is fetched once and then cached for reuse across builds.
 
 ## Updating the KIPR SDK
 

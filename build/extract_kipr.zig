@@ -121,7 +121,10 @@ pub fn main() !void {
 
     if (try reuseIfCurrent(out_path, expected_stamp)) return;
 
-    std.fs.cwd().deleteTree(out_path) catch {};
+    std.fs.cwd().deleteTree(out_path) catch |err| switch (err) {
+        error.FileNotFound => {},
+        else => return err,
+    };
 
     // Open the .deb file
     const deb_file = try std.fs.cwd().openFile(deb_path, .{});
