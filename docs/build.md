@@ -19,12 +19,6 @@ cd Project-XBOT
 direnv allow   # activates the Nix shell automatically
 ```
 
-Or run the shell directly:
-
-```sh
-nix --extra-experimental-features "nix-command flakes" develop --accept-flake-config
-```
-
 ## Building
 
 ### Default Build (Debug, aarch64-linux)
