@@ -30,7 +30,8 @@ const Stamp = struct {
 };
 
 fn fileExists(dir: *std.fs.Dir, path: []const u8) bool {
-    return dir.access(path, .{}) catch false;
+    dir.access(path, .{}) catch return false;
+    return true;
 }
 
 fn loadStamp(dir: *std.fs.Dir) !?Stamp {
@@ -57,7 +58,9 @@ fn loadStamp(dir: *std.fs.Dir) !?Stamp {
 fn writeStamp(dir: *std.fs.Dir, stamp: Stamp) !void {
     var file = try dir.createFile(".kipr-stamp", .{ .truncate = true });
     defer file.close();
-    try file.writer().print("{d} {d}\n", .{ stamp.size, stamp.mtime });
+    var stamp_buf: [96]u8 = undefined;
+    const line = try std.fmt.bufPrint(&stamp_buf, "{d} {d}\n", .{ stamp.size, stamp.mtime });
+    try file.writeAll(line);
 }
 
 fn reuseIfCurrent(out_path: []const u8, expected: Stamp) !bool {
@@ -70,7 +73,6 @@ fn reuseIfCurrent(out_path: []const u8, expected: Stamp) !bool {
     if (!fileExists(&dir, "usr/include/kipr/wombat.h")) return false;
     if (!fileExists(&dir, "usr/lib/libkipr.so")) return false;
 
-    std.log.info("Reusing cached KIPR SDK at {s}", .{out_path});
     return true;
 }
 
@@ -119,10 +121,7 @@ pub fn main() !void {
 
     if (try reuseIfCurrent(out_path, expected_stamp)) return;
 
-    std.fs.cwd().deleteTree(out_path) catch |err| switch (err) {
-        error.FileNotFound => {},
-        else => return err,
-    };
+    std.fs.cwd().deleteTree(out_path) catch {};
 
     // Open the .deb file
     const deb_file = try std.fs.cwd().openFile(deb_path, .{});
@@ -145,8 +144,6 @@ pub fn main() !void {
     // Create output directory
     var out_dir = try std.fs.cwd().makeOpenPath(out_path, .{});
     defer out_dir.close();
-
-    std.log.info("Extracting KIPR SDK to {s}", .{out_path});
 
     // Extract tar — strip_components=1 removes the leading "./"
     try tar.pipeToFileSystem(out_dir, &decompressor.reader, .{

@@ -17,11 +17,11 @@ One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https
 ### Build
 
 ```sh
-# Debug build (default)
+# Production build (ReleaseFast, default)
 zig build
 
-# Production build (recommended for deploying to Wombat)
-zig build -Doptimize=ReleaseFast
+# Debug build
+zig build -Doptimize=Debug
 
 # Clean build outputs and cached SDK
 zig build clean

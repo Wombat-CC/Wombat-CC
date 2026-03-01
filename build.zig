@@ -10,7 +10,13 @@ pub fn build(b: *std.Build) void {
             .abi = .gnu,
         },
     });
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size") orelse .ReleaseFast;
+    std.log.info("Build target: {s}-{s}-{s}, optimize: {s}", .{
+        @tagName(target.result.cpu.arch),
+        @tagName(target.result.os.tag),
+        @tagName(target.result.abi),
+        @tagName(optimize),
+    });
 
     // ── Extract KIPR SDK (cross-platform, pure Zig) ──────────────────
     // Compiles a small host-native tool that unpacks the headers and
@@ -157,21 +163,24 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
     };
 }
 
-fn cleanArtifacts(step: *std.Build.Step, progress: *std.Progress.Node) !void {
-    _ = progress;
+fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void {
+    _ = options;
     const b = step.owner;
     var cwd = std.fs.cwd();
     const paths = [_][]const u8{
         "zig-out",
+        ".zig-cache",
         "zig-cache",
     };
 
     for (paths) |path| {
-        cwd.deleteTree(path) catch |err| switch (err) {
-            error.FileNotFound => {},
-            else => return err,
+        cwd.deleteTree(path) catch {
+            std.log.info("Clean: {s} (not present)", .{path});
+            continue;
         };
+        std.log.info("Clean: removed {s}", .{path});
     }
 
+    std.log.info("Clean complete.", .{});
     _ = b; // unused for now; reserved for future cache-aware cleanups
 }
