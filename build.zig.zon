@@ -1,0 +1,31 @@
+.{
+    .name = .project_xbot,
+    .version = "0.1.0",
+    .fingerprint = 0x480042740aa8fc0f,
+    .minimum_zig_version = "0.15.0",
+
+    // Dependencies managed by Zig's package manager.
+    //
+    // To add libwallaby headers (recommended on first setup):
+    //   zig fetch --save=libwallaby https://github.com/kipr/libwallaby/archive/refs/tags/v1.0.0.tar.gz
+    //
+    // To add a user library from GitHub:
+    //   zig fetch --save=<name> <url>
+    //
+    // After fetching, the dependency hash is recorded here automatically.
+    // Run 'zig build' and the headers are available to your code.
+    .dependencies = .{
+        // .libwallaby = .{
+        //     .url = "https://github.com/kipr/libwallaby/archive/refs/tags/v1.0.0.tar.gz",
+        //     .hash = "...",
+        //     .lazy = true,
+        // },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "include",
+    },
+}

@@ -10,10 +10,14 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
 
-            - name: Build with build.py (Docker toolchain)
-              run: python3 build.py --ci --config configs/config.prod.yaml
+            - uses: mlugg/setup-zig@v2
+              with:
+                  version: 0.15.0
+
+            - name: Build (aarch64-linux, ReleaseFast)
+              run: zig build -Doptimize=ReleaseFast
 
             - name: Create Release and Upload Binary
               uses: softprops/action-gh-release@v1
@@ -21,4 +25,4 @@ jobs:
                   name: ${{ github.ref_name }}
                   draft: false
                   prerelease: false
-                  files: ./out/build/botball_user_program
+                  files: zig-out/bin/botball_user_program
