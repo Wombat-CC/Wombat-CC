@@ -6,11 +6,11 @@ Cross-compilation build system for the [KIPR Wombat](https://www.kipr.org/kipr/h
 
 ### Prerequisites
 
-| Platform | Requirement |
-|----------|-------------|
+| Platform    | Requirement                                  |
+| ----------- | -------------------------------------------- |
 | **Windows** | [Zig 0.15.2+](https://ziglang.org/download/) |
-| **macOS** | [Zig 0.15.2+](https://ziglang.org/download/) |
-| **Linux** | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **macOS**   | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **Linux**   | [Zig 0.15.2+](https://ziglang.org/download/) |
 
 One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https://nixos.org/download.html)** + **[direnv](https://direnv.net/)** for a fully reproducible environment.
 
@@ -95,9 +95,9 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 ## Platform Support
 
 | Platform              | Status |
-|-----------------------|--------|
+| --------------------- | ------ |
 | Linux (x86_64)        | ✅     |
-| macOS (Apple Silicon)  | ✅    |
+| macOS (Apple Silicon) | ✅     |
 | macOS (Intel)         | ✅     |
 | Windows (native)      | ✅     |
 
