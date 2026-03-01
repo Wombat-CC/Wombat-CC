@@ -85,9 +85,12 @@ pub fn build(b: *std.Build) void {
 
     // ── Run step ─────────────────────────────────────────────────────
     // Only define a `run` step when the build target matches the host.
-    if (target.result.cpu_arch == b.graph.host.cpu_arch and
-        target.result.os_tag == b.graph.host.os_tag and
-        target.result.abi == b.graph.host.abi)
+    const tgt = target.result;
+    const host = b.graph.host.result;
+
+    if (tgt.cpu.arch == host.cpu.arch and
+        tgt.os.tag == host.os.tag and
+        tgt.abi == host.abi)
     {
         const run_cmd = b.addRunArtifact(exe);
         run_cmd.step.dependOn(b.getInstallStep());
