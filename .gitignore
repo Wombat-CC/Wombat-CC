@@ -12,5 +12,13 @@ result-*
 # direnv
 .direnv/
 
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*~
+
 # CodeQL
 _codeql_detected_source_root

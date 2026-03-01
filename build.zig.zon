@@ -6,14 +6,15 @@
 
     .dependencies = .{
         .wombat_os = .{
-            .url = "https://github.com/kipr/wombat-os/archive/refs/tags/v32.0.0.tar.gz",
-            .hash = "N-V-__8AAL1uJAbF5hsolkzzR52uh6M17i-mneTusCVQZKDp",
+            .url = "https://github.com/kipr/wombat-os/archive/refs/tags/v31.2.0.tar.gz",
+            .hash = "N-V-__8AAFy-7gMJX41JZq0XgQhY0P9XV_yRQzKMby8UPjy_",
         },
     },
 
     .paths = .{
         "build.zig",
         "build.zig.zon",
+        "build",
         "src",
     },
 }
