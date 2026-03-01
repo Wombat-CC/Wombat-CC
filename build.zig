@@ -13,10 +13,39 @@ pub fn build(b: *std.Build) void {
 
     const optimize = b.standardOptimizeOption(.{});
 
+    // --- Extract KIPR headers and library from wombat-os dependency ---
+    // The wombat-os tarball contains updateFiles/pkgs/kipr.deb which has
+    // the pre-built libkipr.so and real libwallaby headers.
+    const wombat_dep = b.dependency("wombat_os", .{});
+    const extract = b.addSystemCommand(&.{
+        "sh", "-c",
+        \\set -e
+        \\DEB="$1"; INCDIR="$2"; LIBDIR="$3"
+        \\WORK=$(mktemp -d)
+        \\trap 'rm -rf "$WORK"' EXIT
+        \\cd "$WORK"
+        \\ar x "$DEB"
+        \\tar xzf data.tar.*
+        \\cp -r usr/include/* "$INCDIR/"
+        \\cp usr/lib/libkipr.so "$LIBDIR/"
+        ,
+        "extract_kipr",
+    });
+    extract.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
+    const kipr_include = extract.addOutputDirectoryArg("include");
+    const kipr_lib = extract.addOutputDirectoryArg("lib");
+
+    // --- Check if user wants to write in Zig ---
+    const has_zig_main = blk: {
+        std.fs.cwd().access("src/main.zig", .{}) catch break :blk false;
+        break :blk true;
+    };
+
     // --- User executable ---
     const exe = b.addExecutable(.{
         .name = "botball_user_program",
         .root_module = b.createModule(.{
+            .root_source_file = if (has_zig_main) b.path("src/main.zig") else null,
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -24,18 +53,14 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Real libwallaby headers from the KIPR Wombat OS image
-    exe.addIncludePath(b.path("include"));
-
-    // Pre-built libkipr.so from the KIPR Wombat OS image
-    exe.addLibraryPath(b.path("lib"));
+    // KIPR headers and library (extracted from wombat-os at build time)
+    exe.addIncludePath(kipr_include);
+    exe.addLibraryPath(kipr_lib);
     exe.addRPath(.{ .cwd_relative = "/usr/lib" });
     exe.linkSystemLibrary("kipr");
 
-    // Discover and compile user source files from src/
+    // Discover and compile C source files from src/
     const c_files = collectSourceFiles(b, "src", .c);
-    const cpp_files = collectSourceFiles(b, "src", .cpp);
-
     if (c_files.len > 0) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),
@@ -44,6 +69,8 @@ pub fn build(b: *std.Build) void {
         });
     }
 
+    // Discover and compile C++ source files from src/
+    const cpp_files = collectSourceFiles(b, "src", .cpp);
     if (cpp_files.len > 0) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),

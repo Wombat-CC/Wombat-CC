@@ -27,37 +27,59 @@ The output binary is at `zig-out/bin/botball_user_program`.
 
 ```
 your-project/
-├── build.zig          # Build configuration (cross-compilation settings)
-├── build.zig.zon      # Package manifest
+├── build.zig          # Build configuration (auto-fetches KIPR dependencies)
+├── build.zig.zon      # Package manifest (pins wombat-os version)
 ├── flake.nix          # Nix flake (optional dev environment)
 ├── .envrc             # direnv auto-activation
-├── include/           # Real libwallaby headers from KIPR Wombat OS
-│   └── kipr/
-│       ├── wombat.h   # Main include for user code
-│       ├── motor/motor.h
-│       ├── servo/servo.h
-│       └── ...
-├── lib/               # Pre-built libkipr.so from KIPR Wombat OS
-│   └── libkipr.so
-├── src/               # Your source code (C, C++, or Zig)
-│   ├── main.cpp
-│   └── _init_helper.c
+├── src/               # Your source code
+│   ├── main.cpp       # C++ entry point (default)
+│   ├── _init_helper.c # Init helper
+│   └── main.zig       # OR: Zig entry point (create this to use Zig instead)
 └── docs/
     └── build.md
 ```
 
-### Adding Source Files
+## Language Support
 
-Place `.c`, `.cpp`, `.cc`, or `.cxx` files in the `src/` directory — the build system discovers them automatically. Header files go in `include/`.
+### C / C++ (default)
+
+Place `.c`, `.cpp`, `.cc`, or `.cxx` files in `src/`. The build system discovers them automatically. Use `#include <kipr/wombat.h>` to access the KIPR API.
+
+### Zig
+
+Create `src/main.zig` to write your main program in Zig. Use `@cImport` to access the KIPR C API:
+
+```zig
+const std = @import("std");
+const c = @cImport(@cInclude("kipr/wombat.h"));
+
+pub fn main() void {
+    std.debug.print("Hello from Zig!\n", .{});
+    c.ao(); // Call any libwallaby function
+}
+```
+
+When `src/main.zig` exists, it becomes the entry point. You can still have C/C++ helper files alongside it — they are compiled and linked automatically.
 
 ## How It Works
 
-The build system uses:
-- **Real libwallaby headers** extracted from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) image
-- **Pre-built `libkipr.so`** from the same image, for link-time symbol resolution
-- **Zig** as a cross-compiler targeting `aarch64-linux-gnu`
+The build system:
+1. **Auto-fetches** the [KIPR Wombat OS](https://github.com/kipr/wombat-os) package at build time (pinned to a specific release tag)
+2. **Extracts** the official `libkipr.so` and headers from the `kipr.deb` package
+3. **Cross-compiles** your source code targeting `aarch64-linux-gnu` using Zig
+4. **Links** against `libkipr.so` which is already installed on every Wombat at `/usr/lib/libkipr.so`
 
-Your code is compiled and linked against `libkipr.so` which is already installed on every Wombat at `/usr/lib/libkipr.so`. The C++ standard library is statically linked — the only runtime dependencies are `libkipr.so` and standard system libraries (`libc`, `libpthread`) that exist on the Wombat.
+No KIPR files are committed to this repository — they are fetched and cached automatically by Zig's package manager on the first build.
+
+## Updating the KIPR SDK
+
+To update to a newer wombat-os release:
+
+```sh
+zig fetch --save=wombat_os https://github.com/kipr/wombat-os/archive/refs/tags/<NEW_TAG>.tar.gz
+```
+
+This updates the URL and hash in `build.zig.zon`. The next build will use the new version.
 
 ## Adding Libraries
 
@@ -71,17 +93,17 @@ Then reference the dependency in `build.zig`. Dependencies are version-locked vi
 
 ## GitHub Actions
 
-CI automatically builds on every push and pull request. Tagged releases (`v*`) create a GitHub Release with the compiled binary.
+CI automatically builds on pushes to `main` and on pull requests. Tagged releases (`v*`) create a GitHub Release with the compiled binary.
 
 ## Platform Support
 
-| Platform             | Status |
-|----------------------|--------|
-| Linux (x86_64)       | ✅     |
-| macOS (Apple Silicon) | ✅    |
-| macOS (Intel)        | ✅     |
-| Windows (WSL + Nix)  | ✅     |
-| Windows (native Zig) | ✅     |
+| Platform              | Status |
+|-----------------------|--------|
+| Linux (x86_64)        | ✅     |
+| macOS (Apple Silicon)  | ✅    |
+| macOS (Intel)         | ✅     |
+| Windows (WSL + Nix)   | ✅     |
+| Windows (native Zig)  | ✅     |
 
 Zig handles cross-compilation natively — the same `zig build` command works on all platforms.
 

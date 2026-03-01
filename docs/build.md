@@ -2,7 +2,7 @@
 
 ## Build System
 
-Project XBOT uses **Zig** as its build system and cross-compiler. It links against the pre-built `libkipr.so` from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) image using the real libwallaby headers — no Docker, no CMake, no source compilation of libwallaby.
+Project XBOT uses **Zig** as its build system and cross-compiler. The KIPR headers and pre-built `libkipr.so` are **automatically fetched** from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) repository at build time — no manual downloads, no Docker, no CMake.
 
 An optional **Nix flake** is provided for a reproducible development environment.
 
@@ -48,32 +48,58 @@ zig build -Doptimize=ReleaseFast
 
 ## How It Works
 
-The build system:
+On the first build, the Zig package manager:
 
-1. **Compiles** your C/C++ source files in `src/` using Zig's cross-compiler targeting `aarch64-linux-gnu`
-2. **Links** against the pre-built `libkipr.so` (from `lib/`) for symbol resolution at build time
-3. **Produces** a binary that dynamically links only against `libkipr.so` and standard system libraries
+1. **Downloads** the pinned [wombat-os](https://github.com/kipr/wombat-os) release tarball (cached after first fetch)
+2. **Extracts** the `kipr.deb` package from the tarball
+3. **Unpacks** the official libwallaby headers and `libkipr.so` from the deb
+
+Then, on every build:
+
+4. **Compiles** your source files in `src/` using Zig's cross-compiler targeting `aarch64-linux-gnu`
+5. **Links** against `libkipr.so` for symbol resolution at build time
+6. **Produces** a binary that dynamically links only against `libkipr.so` and standard system libraries
 
 The C++ standard library is statically linked by Zig. At runtime on the Wombat, `libkipr.so` is already installed at `/usr/lib/libkipr.so`.
 
-### Headers and Library
+## Language Support
 
-The `include/kipr/` directory contains the **real** libwallaby headers extracted from the official KIPR Wombat OS `kipr.deb` package. The `lib/libkipr.so` is the pre-built aarch64 shared library from the same package.
+### C / C++ (default)
 
-These come from: https://github.com/kipr/wombat-os
-
-## Source Files
-
-Place your source files in the `src/` directory. The build system automatically discovers:
+Place your source files in `src/`. The build system automatically discovers:
 
 - `.c` files — compiled as C11
 - `.cpp`, `.cc`, `.cxx` files — compiled as C++17
 
-Header files go in the `include/` directory.
+Use `#include <kipr/wombat.h>` to access the KIPR API.
+
+### Zig
+
+Create `src/main.zig` to use Zig as your main language. Import the KIPR C API with:
+
+```zig
+const c = @cImport(@cInclude("kipr/wombat.h"));
+
+pub fn main() void {
+    c.ao();  // Call any libwallaby function
+}
+```
+
+When `src/main.zig` exists, it becomes the entry point. C/C++ helper files in `src/` are still compiled and linked alongside it.
+
+## Updating the KIPR SDK
+
+The wombat-os version is pinned in `build.zig.zon`. To update:
+
+```sh
+zig fetch --save=wombat_os https://github.com/kipr/wombat-os/archive/refs/tags/<NEW_TAG>.tar.gz
+```
+
+This updates the URL and hash. The next build uses the new version automatically.
 
 ## GitHub Actions
 
-### CI (every push / pull request)
+### CI (pushes to main / pull requests)
 
 Builds with `-Doptimize=ReleaseFast` and uploads the binary as an artifact.
 
@@ -81,20 +107,11 @@ Builds with `-Doptimize=ReleaseFast` and uploads the binary as an artifact.
 
 Builds with `-Doptimize=ReleaseFast` and creates a GitHub Release with the binary attached.
 
-## Updating libwallaby
-
-To update the headers and library to a newer version:
-
-1. Download the latest `kipr.deb` from [kipr/wombat-os](https://github.com/kipr/wombat-os/tree/main/updateFiles/pkgs)
-2. Extract it: `ar x kipr.deb && tar xzf data.tar.gz`
-3. Copy headers: `cp -r usr/include/kipr include/kipr`
-4. Copy library: `cp usr/lib/libkipr.so lib/`
-
 ## Troubleshooting
 
 ### Build fails with "Could not open source directory"
 
-Ensure the `src/` directory exists and contains at least one `.c`, `.cpp`, `.cc`, or `.cxx` file.
+Ensure the `src/` directory exists and contains at least one source file (`.c`, `.cpp`, `.cc`, `.cxx`, or `.zig`).
 
 ### Zig not found
 
@@ -102,4 +119,8 @@ Install Zig from [ziglang.org/download](https://ziglang.org/download/) or use `n
 
 ### "undefined symbol" errors
 
-Make sure the function you're calling exists in the libwallaby headers (`include/kipr/`). The `lib/libkipr.so` must match the headers.
+Make sure the function you're calling exists in the libwallaby headers. Run `zig fetch --save=wombat_os ...` to update the KIPR SDK if needed.
+
+### First build is slow
+
+The first build downloads the wombat-os tarball (~94 MB). Subsequent builds use the cached version and are fast.

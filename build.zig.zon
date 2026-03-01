@@ -4,13 +4,16 @@
     .fingerprint = 0x480042740aa8fc0f,
     .minimum_zig_version = "0.15.0",
 
-    .dependencies = .{},
+    .dependencies = .{
+        .wombat_os = .{
+            .url = "https://github.com/kipr/wombat-os/archive/refs/tags/v32.0.0.tar.gz",
+            .hash = "N-V-__8AAL1uJAbF5hsolkzzR52uh6M17i-mneTusCVQZKDp",
+        },
+    },
 
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
-        "include",
-        "lib",
     },
 }
