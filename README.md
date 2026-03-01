@@ -6,22 +6,25 @@ Cross-compilation build system for the [KIPR Wombat](https://www.kipr.org/kipr/h
 
 ### Prerequisites
 
-| Platform | Requirement |
-|----------|-------------|
+| Platform    | Requirement                                  |
+| ----------- | -------------------------------------------- |
 | **Windows** | [Zig 0.15.2+](https://ziglang.org/download/) |
-| **macOS** | [Zig 0.15.2+](https://ziglang.org/download/) |
-| **Linux** | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **macOS**   | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **Linux**   | [Zig 0.15.2+](https://ziglang.org/download/) |
 
 One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https://nixos.org/download.html)** + **[direnv](https://direnv.net/)** for a fully reproducible environment.
 
 ### Build
 
 ```sh
-# Debug build (default)
+# Production build (ReleaseFast, default)
 zig build
 
-# Production build (recommended for deploying to Wombat)
-zig build -Doptimize=ReleaseFast
+# Debug build
+zig build -Doptimize=Debug
+
+# Clean build outputs and cached SDK
+zig build clean
 ```
 
 The output binary is at `zig-out/bin/botball_user_program`.
@@ -74,6 +77,7 @@ Delete `src/main.zig` and place `.c`, `.cpp`, `.cc`, or `.cxx` files in `src/`. 
 5. **The binary** links against `libkipr.so` (already installed on every Wombat at `/usr/lib/libkipr.so`)
 
 No KIPR files are committed to this repository. Everything is fetched and cached by the Zig package manager.
+Build output clearly reports whether the cached SDK is being reused or freshly extracted.
 
 ## Updating the KIPR SDK
 
@@ -91,9 +95,9 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 ## Platform Support
 
 | Platform              | Status |
-|-----------------------|--------|
+| --------------------- | ------ |
 | Linux (x86_64)        | ✅     |
-| macOS (Apple Silicon)  | ✅    |
+| macOS (Apple Silicon) | ✅     |
 | macOS (Intel)         | ✅     |
 | Windows (native)      | ✅     |
 

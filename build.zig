@@ -10,7 +10,13 @@ pub fn build(b: *std.Build) void {
             .abi = .gnu,
         },
     });
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size") orelse .ReleaseFast;
+    std.log.info("Build target: {s}-{s}-{s}, optimize: {s}", .{
+        @tagName(target.result.cpu.arch),
+        @tagName(target.result.os.tag),
+        @tagName(target.result.abi),
+        @tagName(optimize),
+    });
 
     // ── Extract KIPR SDK (cross-platform, pure Zig) ──────────────────
     // Compiles a small host-native tool that unpacks the headers and
@@ -98,6 +104,9 @@ pub fn build(b: *std.Build) void {
         const run_step = b.step("run", "Run the executable");
         run_step.dependOn(&run_cmd.step);
     }
+
+    const clean_step = b.step("clean", "Remove build artifacts and cached SDK");
+    clean_step.makeFn = cleanArtifacts;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -152,4 +161,26 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
         .c_files = c_files.toOwnedSlice(b.allocator) catch &.{},
         .cpp_files = cpp_files.toOwnedSlice(b.allocator) catch &.{},
     };
+}
+
+fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void {
+    _ = options;
+    const b = step.owner;
+    var cwd = std.fs.cwd();
+    const paths = [_][]const u8{
+        "zig-out",
+        ".zig-cache",
+        "zig-cache",
+    };
+
+    for (paths) |path| {
+        cwd.deleteTree(path) catch {
+            std.log.info("Clean: {s} (not present)", .{path});
+            continue;
+        };
+        std.log.info("Clean: removed {s}", .{path});
+    }
+
+    std.log.info("Clean complete.", .{});
+    _ = b; // unused for now; reserved for future cache-aware cleanups
 }

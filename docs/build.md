@@ -5,6 +5,7 @@
 Project XBOT uses **Zig** as both its build system and cross-compiler. The KIPR SDK (headers + pre-built `libkipr.so`) is **fetched automatically** from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) repository at build time using a **pure-Zig extraction tool** — no shell commands, no platform-specific tools.
 
 This means `zig build` works identically on **Windows**, **macOS**, and **Linux**.
+Build output now reports whether the cached SDK is reused or freshly extracted.
 
 ## Prerequisites
 
@@ -34,6 +35,14 @@ Output: `zig-out/bin/botball_user_program`
 ```sh
 zig build -Doptimize=ReleaseFast
 ```
+
+### Clean
+
+```sh
+zig build clean
+```
+
+Removes `zig-out/`, `zig-cache/`, and any extracted KIPR SDK cache created by the build.
 
 ### All Optimization Modes
 
