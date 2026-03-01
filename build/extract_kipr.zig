@@ -121,8 +121,9 @@ pub fn main() !void {
 
     if (try reuseIfCurrent(out_path, expected_stamp)) return;
 
-    std.fs.cwd().deleteTree(out_path) catch |err| {
-        std.log.warn("extract_kipr: could not remove stale output '{s}': {}", .{ out_path, err });
+    std.fs.cwd().deleteTree(out_path) catch |err| switch (err) {
+        error.FileNotFound => {},
+        else => std.log.warn("extract_kipr: could not remove stale output '{s}': {}", .{ out_path, err }),
     };
 
     // Open the .deb file
