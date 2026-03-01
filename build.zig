@@ -33,17 +33,14 @@ pub fn build(b: *std.Build) void {
     const kipr_include = sdk_root.path(b, "usr/include");
     const kipr_lib = sdk_root.path(b, "usr/lib");
 
-    // ── Detect language mode ─────────────────────────────────────────
-    // Zig-first: if src/main.zig exists it becomes the entry point.
-    // Otherwise falls back to pure C/C++ (all .c/.cpp in src/).
-    const has_zig_main = blk: {
-        b.build_root.handle.access("src/main.zig", .{}) catch break :blk false;
-        break :blk true;
-    };
+    // ── Detect language mode and source files ────────────────────────
+    // Single scan for entrypoint + C/C++ files to reduce build-script work.
+    const sources = collectSources(b, "src");
+    const has_zig_main = sources.has_zig_main;
+    const c_files = sources.c_files;
+    const cpp_files = sources.cpp_files;
 
     // ── User executable ──────────────────────────────────────────────
-    // Compile any C++ source files in src/
-    const cpp_files = collectSourceFiles(b, "src", .cpp);
     const has_cpp = cpp_files.len > 0;
 
     const exe = b.addExecutable(.{
@@ -67,7 +64,6 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("kipr");
 
     // Compile any C source files in src/
-    const c_files = collectSourceFiles(b, "src", .c);
     if (c_files.len > 0) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),
@@ -97,29 +93,54 @@ pub fn build(b: *std.Build) void {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/// Scan `dir_path` for C or C++ source files, returning their base names.
-fn collectSourceFiles(b: *std.Build, dir_path: []const u8, lang: enum { c, cpp }) []const []const u8 {
-    var list: std.ArrayList([]const u8) = .{};
+const SourceSet = struct {
+    has_zig_main: bool,
+    c_files: []const []const u8,
+    cpp_files: []const []const u8,
+};
+
+/// Scan `dir_path` once for `main.zig`, C, and C++ source files.
+fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
+    var c_files: std.ArrayList([]const u8) = .{};
+    var cpp_files: std.ArrayList([]const u8) = .{};
+    var has_zig_main = false;
+
     var dir = std.fs.cwd().openDir(dir_path, .{ .iterate = true }) catch
-        return list.toOwnedSlice(b.allocator) catch &.{};
+        return .{
+            .has_zig_main = false,
+            .c_files = &.{},
+            .cpp_files = &.{},
+        };
     defer dir.close();
 
     var it = dir.iterate();
     while (it.next() catch null) |entry| {
         if (entry.kind != .file) continue;
+        if (std.mem.eql(u8, entry.name, "main.zig")) has_zig_main = true;
+
         const ext = std.fs.path.extension(entry.name);
-        const match = switch (lang) {
-            .c => std.mem.eql(u8, ext, ".c"),
-            .cpp => std.mem.eql(u8, ext, ".cpp") or
-                std.mem.eql(u8, ext, ".cc") or
-                std.mem.eql(u8, ext, ".cxx"),
-        };
-        if (match) {
-            list.append(
+        if (std.mem.eql(u8, ext, ".c")) {
+            c_files.append(
                 b.allocator,
                 b.allocator.dupe(u8, entry.name) catch @panic("OOM"),
             ) catch @panic("OOM");
+            continue;
         }
+
+        const is_cpp = std.mem.eql(u8, ext, ".cpp") or
+            std.mem.eql(u8, ext, ".cc") or
+            std.mem.eql(u8, ext, ".cxx");
+        if (!is_cpp) continue;
+
+        cpp_files.append(
+            b.allocator,
+            b.allocator.dupe(u8, entry.name) catch @panic("OOM"),
+        ) catch @panic("OOM");
     }
-    return list.toOwnedSlice(b.allocator) catch &.{};
+
+    return .{
+        .has_zig_main = has_zig_main,
+        .c_files = c_files.toOwnedSlice(b.allocator) catch &.{},
+        .cpp_files = cpp_files.toOwnedSlice(b.allocator) catch &.{},
+    };
 }
