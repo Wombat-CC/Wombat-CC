@@ -124,6 +124,43 @@ This updates the URL and content hash in `build.zig.zon`.
 |----------|---------|--------------|
 | CI | Push to `main`, pull requests | Builds with ReleaseFast, uploads artifact |
 | Release | Push `v*` tag | Builds with ReleaseFast, creates GitHub Release |
+| Sync Template | Weekly (Monday) / manual | Syncs infrastructure + checks for SDK updates, opens PRs |
+
+### Sync Template workflow
+
+The **Sync Template** workflow automatically keeps your project up to date so you can focus on writing code. It runs every Monday and can be triggered manually from the Actions tab.
+
+It performs two independent checks:
+
+#### 1. Template infrastructure sync
+
+Syncs build scripts, CI workflows, and documentation from the **latest tagged release** of the upstream [Project XBOT](https://github.com/cdenihan/Project-XBOT) template.
+
+**What gets synced:**
+- `build.zig`, `build/` — build configuration and tools
+- `.github/workflows/` — CI, release, and sync workflows
+- `docs/` — documentation
+- `.editorconfig`, `.envrc`, `.gitignore`, `flake.nix`, `flake.lock` — editor and environment configs
+
+**What is never overwritten:**
+- `src/` — your source code
+- `build.zig.zon` — your project name, version, and dependency pins
+- `README.md` — your project readme
+
+When changes are detected, the workflow opens a pull request on the `auto/sync-template` branch. The `.xbot-version` file tracks which template tag your project is based on.
+
+#### 2. KIPR SDK dependency update
+
+Checks whether a newer [wombat-os](https://github.com/kipr/wombat-os) release is available. If so, it runs `zig fetch --save=wombat_os` to update the URL and content hash in `build.zig.zon` and opens a pull request on the `auto/update-wombat-os` branch.
+
+After merging, the next `zig build` will download the new SDK version automatically.
+
+#### Setup
+
+Enable *Allow GitHub Actions to create and approve pull requests* under **Settings → Actions → General** for the workflow to create PRs.
+
+**Manual trigger with a specific template tag:**
+From the Actions tab, select *Sync Template* → *Run workflow* and optionally provide a tag name (leave empty for the latest tag).
 
 ## Troubleshooting
 

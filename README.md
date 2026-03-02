@@ -91,6 +91,7 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 
 - **CI** — builds on pushes to `main` and on pull requests
 - **Release** — tagged pushes (`v*`) create a GitHub Release with the compiled binary
+- **Sync Template** — checks weekly for upstream template and SDK updates, opens PRs
 
 ## Platform Support
 
@@ -102,6 +103,26 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 | Windows (native)      | ✅     |
 
 The same `zig build` command works on all platforms — Zig handles cross-compilation natively.
+
+## Automatic Updates
+
+This project was created from the [Project XBOT](https://github.com/cdenihan/Project-XBOT) template. A GitHub Actions workflow runs weekly to keep your project up to date automatically — you just focus on writing code.
+
+### What gets updated
+
+| What | How | PR branch |
+| --- | --- | --- |
+| **Build scripts, CI, configs, docs** | Synced from the latest tagged template release | `auto/sync-template` |
+| **KIPR SDK (`wombat_os`)** | Updated when a new [wombat-os](https://github.com/kipr/wombat-os) release is published | `auto/update-wombat-os` |
+
+- **Automatic** — runs every Monday; creates a PR only when updates are available
+- **Manual** — trigger from the Actions tab → *Sync Template* → *Run workflow*
+- **Stable** — always syncs from tagged releases, never from unstable branches
+- **Safe** — your source code in `src/`, project metadata in `build.zig.zon`, and `README.md` are never overwritten by the template sync
+
+The `.xbot-version` file tracks which template version your project is based on.
+
+> **Note:** The workflow requires the repository setting *Allow GitHub Actions to create and approve pull requests* to be enabled under **Settings → Actions → General**.
 
 ## Documentation
 
