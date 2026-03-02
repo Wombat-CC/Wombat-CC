@@ -105,6 +105,18 @@ pub fn build(b: *std.Build) void {
         run_step.dependOn(&run_cmd.step);
     }
 
+    // ── Validate source set ───────────────────────────────────────────
+    if (!has_zig_main and c_files.len == 0 and cpp_files.len == 0) {
+        std.debug.print(
+            \\error: no executable entry point found in src/.
+            \\       Add at least one of:
+            \\         src/main.zig                         (Zig entry point)
+            \\         src/*.c / *.cpp / *.cc / *.cxx      (C/C++ sources)
+            \\
+        , .{});
+        std.process.exit(1);
+    }
+
     const clean_step = b.step("clean", "Remove build artifacts and cached SDK");
     clean_step.makeFn = cleanArtifacts;
 }
@@ -166,7 +178,7 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
 fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void {
     _ = options;
     const b = step.owner;
-    var cwd = std.fs.cwd();
+    const cwd = std.fs.cwd();
     const paths = [_][]const u8{
         "zig-out",
         ".zig-cache",
