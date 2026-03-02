@@ -1,0 +1,95 @@
+name: Sync Template
+
+on:
+    schedule:
+        - cron: "0 9 * * 1" # Every Monday at 9:00 UTC
+    workflow_dispatch:
+        inputs:
+            template_ref:
+                description: "Template branch or tag to sync from"
+                required: false
+                default: "main"
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    sync:
+        runs-on: ubuntu-latest
+        # Skip when running inside the template repository itself
+        if: github.repository != 'cdenihan/Project-XBOT'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Fetch latest template
+              run: |
+                  REF="${{ github.event.inputs.template_ref || 'main' }}"
+                  git clone --depth=1 --branch="$REF" \
+                    "https://github.com/cdenihan/Project-XBOT.git" /tmp/template 2>/dev/null || \
+                  git clone --depth=1 \
+                    "https://github.com/cdenihan/Project-XBOT.git" /tmp/template
+
+                  SHA=$(git -C /tmp/template rev-parse --short HEAD)
+                  echo "TEMPLATE_SHA=$SHA" >> "$GITHUB_ENV"
+
+            - name: Sync infrastructure files
+              run: |
+                  # Infrastructure files to sync (never touches src/ or build.zig.zon)
+                  for f in build.zig .editorconfig .envrc .gitignore flake.nix flake.lock; do
+                    [ -f "/tmp/template/$f" ] && cp "/tmp/template/$f" "$f"
+                  done
+
+                  # Infrastructure directories (adds/updates files, does not remove extras)
+                  for d in build .github/workflows docs; do
+                    if [ -d "/tmp/template/$d" ]; then
+                      mkdir -p "$d"
+                      cp -r "/tmp/template/$d/." "$d/"
+                    fi
+                  done
+
+                  echo "$TEMPLATE_SHA" > .xbot-version
+
+            - name: Check for changes
+              id: diff
+              run: |
+                  if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+                    echo "changed=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "changed=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Create or update pull request
+              if: steps.diff.outputs.changed == 'true'
+              uses: peter-evans/create-pull-request@v7
+              with:
+                  branch: auto/sync-template
+                  delete-branch: true
+                  title: "chore: sync template updates"
+                  commit-message: "chore: sync template infrastructure (${{ env.TEMPLATE_SHA }})"
+                  body: |
+                      Automated sync of infrastructure files from the upstream
+                      [Project XBOT](https://github.com/cdenihan/Project-XBOT) template.
+
+                      **Template commit:** `${{ env.TEMPLATE_SHA }}`
+
+                      ### What changed
+                      Build scripts, CI workflows, editor configs, and documentation have been
+                      updated to match the latest template. **Your source code in `src/` was not
+                      modified.**
+
+                      ### Files synced
+                      - `build.zig` — build configuration
+                      - `build/` — build tools (SDK extractor)
+                      - `.github/workflows/` — CI, release, and sync workflows
+                      - `docs/` — documentation
+                      - `.editorconfig`, `.envrc`, `.gitignore`, `flake.nix`, `flake.lock`
+
+                      ### Files never overwritten
+                      - `src/` — your source code
+                      - `build.zig.zon` — your project metadata and dependency pins
+                      - `README.md` — your project readme
+
+                      > **Tip:** To update the KIPR SDK version separately, run:
+                      > `zig fetch --save=wombat_os <new-release-url>`

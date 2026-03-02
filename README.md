@@ -91,6 +91,7 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 
 - **CI** — builds on pushes to `main` and on pull requests
 - **Release** — tagged pushes (`v*`) create a GitHub Release with the compiled binary
+- **Sync Template** — checks weekly for upstream template updates and opens a PR
 
 ## Platform Support
 
@@ -102,6 +103,18 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 | Windows (native)      | ✅     |
 
 The same `zig build` command works on all platforms — Zig handles cross-compilation natively.
+
+## Template Updates
+
+This project was created from the [Project XBOT](https://github.com/cdenihan/Project-XBOT) template. When the template's build scripts, CI workflows, or documentation are updated, a GitHub Actions workflow automatically opens a pull request in your repository with the changes. Your source code in `src/` and project metadata in `build.zig.zon` are never overwritten.
+
+- **Automatic** — the `Sync Template` workflow runs every Monday and creates a PR if updates are available
+- **Manual** — trigger the workflow from the Actions tab → *Sync Template* → *Run workflow*
+- **Selective** — only infrastructure files are synced; your code and project config stay untouched
+
+The `.xbot-version` file tracks which template version your project is based on.
+
+> **Note:** The sync workflow requires the repository setting *Allow GitHub Actions to create and approve pull requests* to be enabled under **Settings → Actions → General**.
 
 ## Documentation
 
