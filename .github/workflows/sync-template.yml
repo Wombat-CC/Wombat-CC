@@ -30,7 +30,14 @@ jobs:
                   MANUAL_REF="${{ github.event.inputs.template_ref }}"
 
                   if [ -n "$MANUAL_REF" ]; then
-                    echo "ref=$MANUAL_REF" >> "$GITHUB_OUTPUT"
+                    TAG_MATCH=$(git ls-remote --tags "https://github.com/$REPO.git" \
+                      "refs/tags/$MANUAL_REF" "refs/tags/$MANUAL_REF^{}" | head -1)
+                    if [ -n "$TAG_MATCH" ]; then
+                      echo "ref=$MANUAL_REF" >> "$GITHUB_OUTPUT"
+                    else
+                      echo "::error::Manual template_ref '$MANUAL_REF' is not an existing tag in $REPO — skipping sync"
+                      echo "ref=" >> "$GITHUB_OUTPUT"
+                    fi
                   else
                     # Resolve the latest tag (sorted by version), filtering out ^{} entries
                     LATEST_TAG=$(git ls-remote --tags --sort=-v:refname \
@@ -39,8 +46,8 @@ jobs:
                     if [ -n "$LATEST_TAG" ]; then
                       echo "ref=$LATEST_TAG" >> "$GITHUB_OUTPUT"
                     else
-                      echo "::error::No tags found in template repo — skipping sync"
-                      echo "ref=" >> "$GITHUB_OUTPUT"
+                      echo "::error::No tags found in template repo — no tags available to sync"
+                      exit 1
                     fi
                   fi
 
@@ -128,11 +135,21 @@ jobs:
               id: check
               run: |
                   # Extract current tag from the URL in build.zig.zon
-                  CURRENT=$(sed -n 's|.*kipr/wombat-os/archive/refs/tags/\([^"]*\)\.tar\.gz.*|\1|p' build.zig.zon)
+                  CURRENT=$(sed -n 's|.*kipr/wombat-os/archive/refs/tags/\([^"]*\)\.tar\.gz.*|\1|p' build.zig.zon | head -1)
+
+                  if [ -z "$CURRENT" ]; then
+                    echo "::warning::Could not parse current wombat-os version from build.zig.zon"
+                    echo "current=" >> "$GITHUB_OUTPUT"
+                    echo "latest=" >> "$GITHUB_OUTPUT"
+                    echo "update=false" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
 
                   # Get latest stable release tag from kipr/wombat-os
                   LATEST=$(curl -sL \
                     -H "Accept: application/vnd.github+json" \
+                    -H "Authorization: Bearer ${{ github.token }}" \
+                    -H "X-GitHub-Api-Version: 2022-11-28" \
                     "https://api.github.com/repos/kipr/wombat-os/releases/latest" \
                     | jq -r '.tag_name // empty')
 
