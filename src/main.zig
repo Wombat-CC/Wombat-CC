@@ -11,8 +11,8 @@ const std = @import("std");
 const wombat = @cImport(@cInclude("kipr/wombat.h"));
 
 pub fn main() void {
-    std.debug.print("[INIT] Welcome to Project XBOT (Zig)\n", .{});
-    std.debug.print("[INFO] Using KIPR libwallaby v{s}\n", .{wombat.KIPR_VERSION});
+    std.log.info("Welcome to Project XBOT (Zig)\n", .{});
+    std.log.info("Using KIPR libwallaby v{s}\n", .{wombat.KIPR_VERSION});
 
     // ── Example: drive motors forward for 1 second, then stop ────────
     // wombat.motor(0, 100);   // motor 0 at 100% power
@@ -20,6 +20,6 @@ pub fn main() void {
     // wombat.msleep(1000);    // wait 1 second
     // wombat.ao();            // all off
 
-    std.debug.print("[STOP] Shutting down\n", .{});
+    std.log.info("Shutting down\n", .{});
     wombat.ao();
 }
