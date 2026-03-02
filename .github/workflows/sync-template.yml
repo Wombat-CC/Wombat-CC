@@ -26,10 +26,12 @@ jobs:
             - name: Fetch latest template
               run: |
                   REF="${{ github.event.inputs.template_ref || 'main' }}"
-                  git clone --depth=1 --branch="$REF" \
-                    "https://github.com/cdenihan/Project-XBOT.git" /tmp/template 2>/dev/null || \
-                  git clone --depth=1 \
-                    "https://github.com/cdenihan/Project-XBOT.git" /tmp/template
+                  if ! git clone --depth=1 --branch="$REF" \
+                    "https://github.com/cdenihan/Project-XBOT.git" /tmp/template; then
+                    echo "::warning::Could not clone ref '$REF', falling back to default branch"
+                    git clone --depth=1 \
+                      "https://github.com/cdenihan/Project-XBOT.git" /tmp/template
+                  fi
 
                   SHA=$(git -C /tmp/template rev-parse --short HEAD)
                   echo "TEMPLATE_SHA=$SHA" >> "$GITHUB_ENV"
@@ -41,7 +43,8 @@ jobs:
                     [ -f "/tmp/template/$f" ] && cp "/tmp/template/$f" "$f"
                   done
 
-                  # Infrastructure directories (adds/updates files, does not remove extras)
+                  # Infrastructure directories (adds/updates files; does not delete
+                  # user-added files like custom workflows or extra docs)
                   for d in build .github/workflows docs; do
                     if [ -d "/tmp/template/$d" ]; then
                       mkdir -p "$d"
