@@ -26,23 +26,40 @@ jobs:
             - name: Resolve template ref
               id: resolve
               run: |
+                  set -e -o pipefail
                   REPO="cdenihan/Project-XBOT"
                   MANUAL_REF="${{ github.event.inputs.template_ref }}"
 
                   if [ -n "$MANUAL_REF" ]; then
-                    TAG_MATCH=$(git ls-remote --tags "https://github.com/$REPO.git" \
-                      "refs/tags/$MANUAL_REF" "refs/tags/$MANUAL_REF^{}" | head -1)
-                    if [ -n "$TAG_MATCH" ]; then
+                    case "$MANUAL_REF" in
+                      *[*?[\]]*)
+                        echo "::error::Manual template_ref '$MANUAL_REF' contains invalid glob characters (* ? [ ]) -- failing sync"
+                        exit 1
+                      ;;
+                    esac
+
+                    if ! TAG_MATCH=$(git ls-remote --tags "https://github.com/$REPO.git" \
+                      "refs/tags/$MANUAL_REF" "refs/tags/$MANUAL_REF^{}"); then
+                      echo "::error::Failed to query template tags from $REPO"
+                      exit 1
+                    fi
+
+                    TAG_REF=$(printf '%s\n' "$TAG_MATCH" | awk 'NR==1 {print $2}')
+                    TAG_BASE=$(printf '%s\n' "$TAG_REF" | sed 's/\^{}$//')
+                    if [ "$TAG_BASE" = "refs/tags/$MANUAL_REF" ]; then
                       echo "ref=$MANUAL_REF" >> "$GITHUB_OUTPUT"
                     else
-                      echo "::error::Manual template_ref '$MANUAL_REF' is not an existing tag in $REPO — skipping sync"
-                      echo "ref=" >> "$GITHUB_OUTPUT"
+                      echo "::error::Manual template_ref '$MANUAL_REF' is not an existing tag in $REPO — failing sync"
+                      exit 1
                     fi
                   else
                     # Resolve the latest tag (sorted by version), filtering out ^{} entries
-                    LATEST_TAG=$(git ls-remote --tags --sort=-v:refname \
-                      "https://github.com/$REPO.git" \
-                      | grep -v '\^{}' | head -1 | sed 's|.*refs/tags/||')
+                    if ! TAG_LIST=$(git ls-remote --tags --sort=-v:refname "https://github.com/$REPO.git"); then
+                      echo "::error::Failed to query template tags from $REPO"
+                      exit 1
+                    fi
+
+                    LATEST_TAG=$(printf '%s\n' "$TAG_LIST" | awk '$2 !~ /\^\{\}$/ {sub(/^.*refs\/tags\//, "", $2); print $2; exit}')
                     if [ -n "$LATEST_TAG" ]; then
                       echo "ref=$LATEST_TAG" >> "$GITHUB_OUTPUT"
                     else
