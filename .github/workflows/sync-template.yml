@@ -18,7 +18,7 @@ jobs:
     sync:
         runs-on: ubuntu-latest
         # Skip when running inside the template repository itself
-        if: github.repository != 'cdenihan/Project-XBOT'
+        if: github.repository != 'cdenihan/Wombat-CC'
 
         steps:
             - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
               id: resolve
               run: |
                   set -e -o pipefail
-                  REPO="cdenihan/Project-XBOT"
+                  REPO="cdenihan/Wombat-CC"
                   MANUAL_REF="${{ github.event.inputs.template_ref }}"
 
                   if [ -n "$MANUAL_REF" ]; then
@@ -73,7 +73,7 @@ jobs:
               run: |
                   REF="${{ steps.resolve.outputs.ref }}"
                   git clone --depth=1 --branch="$REF" \
-                    "https://github.com/cdenihan/Project-XBOT.git" /tmp/template
+                    "https://github.com/cdenihan/Wombat-CC.git" /tmp/template
 
                   echo "TEMPLATE_REF=$REF" >> "$GITHUB_ENV"
                   SHA=$(git -C /tmp/template rev-parse --short HEAD)
