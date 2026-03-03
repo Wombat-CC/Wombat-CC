@@ -186,6 +186,55 @@ zig fetch --save=wombat_cc_lib_drivetrain https://example.com/drive-train.tar.gz
 zig build
 ```
 
+### Importing headers in your main program
+
+#### C / C++
+
+When a library exports named lazy path `include`, you can include headers with angle brackets:
+
+```cpp
+#include <Arm.hpp>
+#include <Drivetrain.hpp>
+```
+
+Example:
+
+```cpp
+int main() {
+    Drivetrain drivetrain(0, 1, 2, 3, 0, 1);
+    drivetrain.SetPerformance(1.0, 1.0, 1.0, 1.0);
+    drivetrain.DriveForwardLineTracking(5000, 1000);
+    return 0;
+}
+```
+
+#### Zig
+
+Zig does not directly consume C++ classes from C++ headers. If you want to use Drivetrain/Arm from `main.zig`, expose a C ABI shim from the library and call that shim via `@cImport`.
+
+Example C shim header (`drivetrain_c_api.h`):
+
+```c
+typedef struct DrivetrainHandle DrivetrainHandle;
+DrivetrainHandle* drivetrain_create(int fl, int fr, int rl, int rr, int fl_ir, int fr_ir);
+void drivetrain_destroy(DrivetrainHandle* handle);
+void drivetrain_drive_forward_line_tracking(DrivetrainHandle* handle, int ticks, int speed);
+```
+
+Example Zig call site:
+
+```zig
+const dt = @cImport(@cInclude("drivetrain_c_api.h"));
+
+pub fn main() void {
+    const drive = dt.drivetrain_create(0, 1, 2, 3, 0, 1);
+    defer dt.drivetrain_destroy(drive);
+    dt.drivetrain_drive_forward_line_tracking(drive, 5000, 1000);
+}
+```
+
+If you need direct class usage, prefer a C++ main program.
+
 ### Mixed (Zig + C/C++)
 
 When `src/main.zig` exists, it becomes the entry point. Any C/C++ files in `src/` are still compiled and linked alongside the Zig code — useful for gradual migration or calling C helpers.

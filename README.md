@@ -155,6 +155,54 @@ zig fetch --save=wombat_cc_lib_line_follow https://example.com/line-follow.tar.g
 zig build
 ```
 
+### Using Drivetrain/Arm in your program
+
+#### C / C++ entrypoint (direct class usage)
+
+Use a C++ `src/main.cpp` and include the exported headers directly:
+
+```cpp
+#include <Arm.hpp>
+#include <Drivetrain.hpp>
+
+int main() {
+    Arm arm(1, 2, 3);
+    Drivetrain drivetrain(0, 1, 2, 3, 0, 1);
+    drivetrain.SetPerformance(1.0, 1.0, 1.0, 1.0);
+    drivetrain.DriveForwardLineTracking(5000, 1000);
+    return 0;
+}
+```
+
+#### Zig entrypoint (`src/main.zig`)
+
+Zig cannot call C++ classes directly from headers. To use Drivetrain/Arm from Zig, add a small C API wrapper in a dependency, then import that C header in Zig.
+
+Wrapper header example (`drivetrain_c_api.h`):
+
+```c
+typedef struct DrivetrainHandle DrivetrainHandle;
+DrivetrainHandle* drivetrain_create(int fl, int fr, int rl, int rr, int fl_ir, int fr_ir);
+void drivetrain_destroy(DrivetrainHandle* handle);
+void drivetrain_set_performance(DrivetrainHandle* handle, double flp, double frp, double rlp, double rrp);
+void drivetrain_drive_forward_line_tracking(DrivetrainHandle* handle, int ticks, int speed);
+```
+
+Zig usage:
+
+```zig
+const dt = @cImport(@cInclude("drivetrain_c_api.h"));
+
+pub fn main() void {
+    const drive = dt.drivetrain_create(0, 1, 2, 3, 0, 1);
+    defer dt.drivetrain_destroy(drive);
+    dt.drivetrain_set_performance(drive, 1.0, 1.0, 1.0, 1.0);
+    dt.drivetrain_drive_forward_line_tracking(drive, 5000, 1000);
+}
+```
+
+If you do not want a C wrapper, use a C/C++ main file instead of `main.zig`.
+
 ## GitHub Actions
 
 - **CI** — builds on pushes to `main` and on pull requests
