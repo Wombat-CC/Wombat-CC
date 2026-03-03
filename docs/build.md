@@ -106,6 +106,69 @@ Delete `src/main.zig` and add `.c` / `.cpp` / `.cc` / `.cxx` files to `src/`. Th
 
 Use `#include <kipr/wombat.h>` to access the KIPR API.
 
+### Libraries fetched with Zig (C, C++, Zig)
+
+Project XBOT supports library dependencies fetched through Zig packages.
+
+#### Add a library dependency
+
+```sh
+zig fetch --save=wombat_drivetrain https://github.com/cdenihan/Wombat-DriveTrain/archive/refs/heads/main.tar.gz
+```
+
+This adds the dependency to `build.zig.zon`.
+
+#### Library package format
+
+For automatic integration, use one of these layouts:
+
+```text
+# Zig library (created with `zig init`)
+<library>/
+├── build.zig
+└── src/
+    └── root.zig
+
+# C/C++ library
+<library>/
+├── include/          # public headers
+└── src/              # .c/.cpp/.cc/.cxx sources
+```
+
+#### What the build does automatically
+
+During `zig build`, Project XBOT:
+
+1. Reads dependencies from `build.zig.zon`
+2. Skips the special `wombat_os` SDK dependency
+3. For each remaining dependency:
+   - imports the Zig module when the dependency's `build.zig` exports a module with the same name as the dependency key
+   - scans `src/` for `.c`, `.cpp`, `.cc`, `.cxx`
+   - adds `include/` and `src/` to include paths
+   - compiles and links all discovered C/C++ sources
+4. Links libc++ only when any C++ sources are present
+
+#### Using fetched libraries in Zig
+
+Import Zig modules and C headers directly:
+
+```zig
+const mylib = @import("wombat_drivetrain");
+
+const mylib_c = @cImport({
+    @cInclude("your_library_header.h");
+});
+```
+
+Then call APIs as usual (`mylib.someFunction(...)` or `mylib_c.some_function(...)`).
+
+#### Performance and caching
+
+No CMake/Make tooling is used. Everything is integrated through Zig's native build graph, which keeps builds fast and cross-platform:
+- Package downloads are cached by Zig package manager
+- Compiled artifacts are cached in Zig build cache
+- Rebuilds are incremental and only recompile changed inputs
+
 ### Mixed (Zig + C/C++)
 
 When `src/main.zig` exists, it becomes the entry point. Any C/C++ files in `src/` are still compiled and linked alongside the Zig code — useful for gradual migration or calling C helpers.

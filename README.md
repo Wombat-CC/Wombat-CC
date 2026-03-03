@@ -68,6 +68,52 @@ pub fn main() void {
 
 Delete `src/main.zig` and place `.c`, `.cpp`, `.cc`, or `.cxx` files in `src/`. The build system discovers them automatically. Use `#include <kipr/wombat.h>` to access the KIPR API.
 
+### Libraries via `zig fetch` (C, C++, Zig)
+
+You can fetch helper libraries as Zig package dependencies and use them directly.
+
+1. Fetch and save the dependency in `build.zig.zon`:
+
+```sh
+zig fetch --save=wombat_drivetrain https://github.com/cdenihan/Wombat-DriveTrain/archive/refs/heads/main.tar.gz
+```
+
+2. Use the library in your code:
+
+```zig
+// Zig library (project created with `zig init`)
+const drivetrain = @import("wombat_drivetrain");
+
+// C/C++ library header from include/
+const drivetrain_c = @cImport({
+    @cInclude("your_library_header.h");
+});
+```
+
+3. Build normally with `zig build`.
+
+Project XBOT automatically detects all non-`wombat_os` dependencies and:
+- imports Zig modules whose dependency `build.zig` exports a module with the same name as the dependency key
+- compiles and links C/C++ files found in `src/`
+- adds `include/` and `src/` as include paths for those C/C++ libraries
+
+Expected library layouts:
+
+```text
+# Zig library (`zig init`)
+<library>/
+├── build.zig
+└── src/
+    └── root.zig
+
+# C/C++ library
+<library>/
+├── include/
+└── src/  # .c/.cpp/.cc/.cxx
+```
+
+Zig's package/build cache keeps dependency fetches and compilation incremental, so rebuilds stay fast.
+
 ## How It Works
 
 1. **Zig fetches** the pinned [wombat-os](https://github.com/kipr/wombat-os) release tarball (cached after first download)

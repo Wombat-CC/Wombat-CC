@@ -45,9 +45,10 @@ pub fn build(b: *std.Build) void {
     const has_zig_main = sources.has_zig_main;
     const c_files = sources.c_files;
     const cpp_files = sources.cpp_files;
+    const libraries = collectLibraries(b);
 
     // ── User executable ──────────────────────────────────────────────
-    const has_cpp = cpp_files.len > 0;
+    const has_cpp = cpp_files.len > 0 or hasCppLib(libraries);
 
     const exe = b.addExecutable(.{
         .name = "botball_user_program",
@@ -80,11 +81,44 @@ pub fn build(b: *std.Build) void {
 
     // Link C++ source files (already collected above)
     if (has_cpp) {
+        exe.linkLibCpp();
+    }
+    if (cpp_files.len > 0) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),
             .files = cpp_files,
             .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
         });
+    }
+
+    // Compile/import linked package dependencies fetched via `zig fetch`.
+    for (libraries) |lib| {
+        std.log.info("Including library dependency: {s}", .{lib.name});
+
+        if (lib.zig_module) |mod| {
+            exe.root_module.addImport(lib.name, mod);
+        }
+
+        if (lib.c_files.len > 0 or lib.cpp_files.len > 0) {
+            exe.addIncludePath(lib.include_root);
+            exe.addIncludePath(lib.src_root);
+        }
+
+        if (lib.c_files.len > 0) {
+            exe.addCSourceFiles(.{
+                .root = lib.src_root,
+                .files = lib.c_files,
+                .flags = &.{ "-std=c11", "-Wall", "-Wextra" },
+            });
+        }
+
+        if (lib.cpp_files.len > 0) {
+            exe.addCSourceFiles(.{
+                .root = lib.src_root,
+                .files = lib.cpp_files,
+                .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+            });
+        }
     }
 
     b.installArtifact(exe);
@@ -129,13 +163,65 @@ const SourceSet = struct {
     cpp_files: []const []const u8,
 };
 
+const LibraryDependency = struct {
+    name: []const u8,
+    include_root: std.Build.LazyPath,
+    src_root: std.Build.LazyPath,
+    c_files: []const []const u8,
+    cpp_files: []const []const u8,
+    zig_module: ?*std.Build.Module,
+};
+
+fn hasCppLib(libs: []const LibraryDependency) bool {
+    for (libs) |lib| {
+        if (lib.cpp_files.len > 0) return true;
+    }
+    return false;
+}
+
+/// Collect library dependencies from build.zig.zon (except wombat_os).
+/// Expected package layout:
+///   src/root.zig (for Zig modules, as in `zig init`)
+///   include/  (public headers)
+///   src/      (C/C++ sources)
+fn collectLibraries(b: *std.Build) []const LibraryDependency {
+    var libs: std.ArrayList(LibraryDependency) = .{};
+
+    for (b.available_deps) |dep_info| {
+        const dep_name = dep_info[0];
+        if (std.mem.eql(u8, dep_name, "wombat_os")) continue;
+
+        const dep = b.lazyDependency(dep_name, .{}) orelse continue;
+        const dep_sources = collectSources(b, dep.builder.pathFromRoot("src"));
+        const zig_module = dep.builder.modules.get(dep_name);
+        if (dep_sources.c_files.len == 0 and dep_sources.cpp_files.len == 0 and zig_module == null) continue;
+
+        libs.append(
+            b.allocator,
+            .{
+                .name = dep_name,
+                .include_root = dep.path("include"),
+                .src_root = dep.path("src"),
+                .c_files = dep_sources.c_files,
+                .cpp_files = dep_sources.cpp_files,
+                .zig_module = zig_module,
+            },
+        ) catch @panic("OOM");
+    }
+
+    return libs.toOwnedSlice(b.allocator) catch &.{};
+}
+
 /// Scan `dir_path` once for `main.zig`, C, and C++ source files.
 fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
     var c_files: std.ArrayList([]const u8) = .{};
     var cpp_files: std.ArrayList([]const u8) = .{};
     var has_zig_main = false;
 
-    var dir = std.fs.cwd().openDir(dir_path, .{ .iterate = true }) catch
+    var dir = (if (std.fs.path.isAbsolute(dir_path))
+        std.fs.openDirAbsolute(dir_path, .{ .iterate = true })
+    else
+        std.fs.cwd().openDir(dir_path, .{ .iterate = true })) catch
         return .{
             .has_zig_main = false,
             .c_files = &.{},
