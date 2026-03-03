@@ -227,7 +227,7 @@ Syncs build scripts, CI workflows, and documentation from the **latest tagged re
 - `build.zig.zon` — your project name, version, and dependency pins
 - `README.md` — your project readme
 
-When changes are detected, the workflow opens a pull request on the `auto/sync-template` branch. The `.wombat-cc-version` file tracks which template tag your project is based on.
+When changes are detected, the workflow opens a pull request on the `auto/sync-template` branch. The `.wombat-cc-version` file tracks which template tag your project is based on (and in this template repository is automatically updated on tag releases).
 
 #### 2. KIPR SDK dependency update
 
