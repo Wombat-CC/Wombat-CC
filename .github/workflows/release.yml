@@ -15,6 +15,31 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
+            - name: Update .wombat-cc-version
+              if: github.repository == 'cdenihan/Wombat-CC'
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
+                  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+              run: |
+                  set -euo pipefail
+
+                  git fetch origin "$DEFAULT_BRANCH"
+                  WORKTREE_DIR="$(mktemp -d)"
+                  trap 'git worktree remove --force "$WORKTREE_DIR" || echo "::warning::Failed to remove temporary worktree: $WORKTREE_DIR"' EXIT
+                  git worktree add "$WORKTREE_DIR" "origin/$DEFAULT_BRANCH"
+                  cd "$WORKTREE_DIR"
+
+                  echo "$RELEASE_TAG" > .wombat-cc-version
+                  if git diff --quiet -- .wombat-cc-version; then
+                    exit 0
+                  fi
+
+                  git config --local user.name "github-actions[bot]"
+                  git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add .wombat-cc-version
+                  git commit -m "chore: update .wombat-cc-version to $RELEASE_TAG"
+                  git push origin "HEAD:$DEFAULT_BRANCH"
+
             - uses: mlugg/setup-zig@v2
               with:
                   version: 0.15.2

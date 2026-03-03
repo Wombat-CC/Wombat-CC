@@ -188,7 +188,7 @@ This repository is a GitHub template. A GitHub Actions workflow runs weekly to k
 - **Stable** — always syncs from tagged releases, never from unstable branches
 - **Safe** — your source code in `src/`, project metadata in `build.zig.zon`, and `README.md` are never overwritten by the template sync
 
-The `.wombat-cc-version` file tracks which template version your project is based on.
+The `.wombat-cc-version` file tracks which template version your project is based on. In this template repository, it is updated automatically by the tag-release workflow.
 
 > **Note:** The workflow requires the repository setting *Allow GitHub Actions to create and approve pull requests* to be enabled under **Settings → Actions → General**.
 
