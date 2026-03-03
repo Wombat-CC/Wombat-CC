@@ -1,4 +1,4 @@
-# Project XBOT
+# Wombat CC
 
 Cross-compilation build system for the [KIPR Wombat](https://www.kipr.org/kipr/hardware-software/wombat) robot controller. Write your code in **Zig** (or C/C++) and produce an `aarch64-linux` binary that runs directly on the Wombat — no Docker required.
 
@@ -32,7 +32,7 @@ The output binary is at `zig-out/bin/botball_user_program`.
 ### Project Layout
 
 ```
-Project-XBOT/
+your-project/
 ├── build.zig          # Build configuration (auto-fetches KIPR SDK)
 ├── build.zig.zon      # Package manifest (pins wombat-os version)
 ├── build/
@@ -87,6 +87,74 @@ zig fetch --save=wombat_os https://github.com/kipr/wombat-os/archive/refs/tags/<
 
 This updates the URL and content hash in `build.zig.zon`. The next build uses the new version.
 
+## Library Packages
+
+The root build auto-links library dependencies whose `build.zig.zon` dependency keys (entry names) start with `wombat_cc_lib_`. Each such dependency is expected to provide:
+
+- artifact name: `lib`
+- named lazy path: `include`
+
+This makes future fetched libraries work cleanly from day one:
+
+```sh
+zig fetch --save=wombat_cc_lib_<name> <url>
+```
+
+Use local path dependencies with the same naming and exported build interface for in-repo libraries.
+
+### Example: local in-repo library
+
+Add to `build.zig.zon`:
+
+```zig
+.dependencies = .{
+    .wombat_cc_lib_arm = .{ .path = "lib/Arm" },
+};
+```
+
+Create `lib/Arm/build.zig` that exports `lib` and `include`:
+
+```zig
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const kipr_include = b.option(std.Build.LazyPath, "kipr_include", "Path to KIPR headers") orelse
+        @panic("missing required build option: -Dkipr_include");
+
+    const lib = b.addLibrary(.{
+        .linkage = .static,
+        .name = "lib",
+        .root_module = b.createModule(.{
+            .root_source_file = null,
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .link_libcpp = true,
+        }),
+    });
+
+    lib.addIncludePath(b.path("include"));
+    lib.addIncludePath(kipr_include);
+    lib.addCSourceFiles(.{
+        .root = b.path("src"),
+        .files = &.{"Arm.cpp"},
+        .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+    });
+
+    b.addNamedLazyPath("include", b.path("include"));
+    b.installArtifact(lib);
+}
+```
+
+### Example: fetched library
+
+```sh
+zig fetch --save=wombat_cc_lib_line_follow https://example.com/line-follow.tar.gz
+zig build
+```
+
 ## GitHub Actions
 
 - **CI** — builds on pushes to `main` and on pull requests
@@ -106,7 +174,7 @@ The same `zig build` command works on all platforms — Zig handles cross-compil
 
 ## Automatic Updates
 
-This project was created from the [Project XBOT](https://github.com/cdenihan/Project-XBOT) template. A GitHub Actions workflow runs weekly to keep your project up to date automatically — you just focus on writing code.
+This repository is a GitHub template. A GitHub Actions workflow runs weekly to keep generated projects up to date automatically — you just focus on writing code.
 
 ### What gets updated
 
@@ -120,7 +188,7 @@ This project was created from the [Project XBOT](https://github.com/cdenihan/Pro
 - **Stable** — always syncs from tagged releases, never from unstable branches
 - **Safe** — your source code in `src/`, project metadata in `build.zig.zon`, and `README.md` are never overwritten by the template sync
 
-The `.xbot-version` file tracks which template version your project is based on.
+The `.wombat-cc-version` file tracks which template version your project is based on.
 
 > **Note:** The workflow requires the repository setting *Allow GitHub Actions to create and approve pull requests* to be enabled under **Settings → Actions → General**.
 

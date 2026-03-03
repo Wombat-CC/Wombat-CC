@@ -96,7 +96,7 @@ jobs:
                     fi
                   done
 
-                  echo "$TEMPLATE_REF" > .xbot-version
+                  echo "$TEMPLATE_REF" > .wombat-cc-version
 
             - name: Check for changes
               if: steps.resolve.outputs.ref != ''
@@ -118,7 +118,7 @@ jobs:
                   commit-message: "chore: sync template infrastructure (${{ env.TEMPLATE_REF }})"
                   body: |
                       Automated sync of infrastructure files from the upstream
-                      [Project XBOT](https://github.com/cdenihan/Project-XBOT) template.
+                      [Wombat CC](https://github.com/cdenihan/Wombat-CC) template.
 
                       **Template version:** `${{ env.TEMPLATE_REF }}` (`${{ env.TEMPLATE_SHA }}`)
 

@@ -1,7 +1,7 @@
 .{
-    .name = .project_xbot,
+    .name = .wombat_cc,
     .version = "0.1.0",
-    .fingerprint = 0x480042740aa8fc0f,
+    .fingerprint = 0x69d983eccff479ab,
     .minimum_zig_version = "0.15.0",
 
     .dependencies = .{
