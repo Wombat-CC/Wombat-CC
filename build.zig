@@ -241,12 +241,19 @@ fn collectLibraries(b: *std.Build) []const LibraryDependency {
 }
 
 fn appendClonedLibraries(b: *std.Build, libs: *std.ArrayList(LibraryDependency)) void {
-    var lib_dir = std.fs.cwd().openDir("lib", .{ .iterate = true }) catch return;
+    var lib_dir = std.fs.cwd().openDir("lib", .{ .iterate = true }) catch |err| switch (err) {
+        error.FileNotFound => return,
+        else => {
+            std.log.warn("Skipping local library scan in lib/: {s}", .{@errorName(err)});
+            return;
+        },
+    };
     defer lib_dir.close();
 
     var it = lib_dir.iterate();
     while (it.next() catch null) |entry| {
         if (entry.kind != .directory) continue;
+        if (entry.name.len == 0 or entry.name[0] == '.') continue;
 
         const root = b.pathJoin(&.{ "lib", entry.name });
         const src_path = b.pathJoin(&.{ root, "src" });
