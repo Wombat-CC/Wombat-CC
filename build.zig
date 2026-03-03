@@ -251,7 +251,13 @@ fn appendClonedLibraries(b: *std.Build, libs: *std.ArrayList(LibraryDependency))
     defer lib_dir.close();
 
     var it = lib_dir.iterate();
-    while (it.next() catch null) |entry| {
+    while (true) {
+        const next = it.next() catch |err| {
+            std.log.warn("Stopping local library scan in lib/: {s}", .{@errorName(err)});
+            break;
+        };
+        const entry = next orelse break;
+
         if (entry.kind != .directory) continue;
         if (entry.name.len == 0 or entry.name[0] == '.') continue;
 
