@@ -2,7 +2,7 @@
 
 ## Overview
 
-Project XBOT uses **Zig** as both its build system and cross-compiler. The KIPR SDK (headers + pre-built `libkipr.so`) is **fetched automatically** from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) repository at build time using a **pure-Zig extraction tool** — no shell commands, no platform-specific tools.
+Wombat CC uses **Zig** as both its build system and cross-compiler. The KIPR SDK (headers + pre-built `libkipr.so`) is **fetched automatically** from the official [KIPR Wombat OS](https://github.com/kipr/wombat-os) repository at build time using a **pure-Zig extraction tool** — no shell commands, no platform-specific tools.
 
 This means `zig build` works identically on **Windows**, **macOS**, and **Linux**.
 Build output now reports whether the cached SDK is reused or freshly extracted.
@@ -16,7 +16,7 @@ Download Zig 0.15.2 or later from [ziglang.org/download](https://ziglang.org/dow
 ### Option B: Nix + direnv (Linux / macOS only)
 
 ```sh
-cd Project-XBOT
+cd <your-project>
 direnv allow   # activates the Nix shell automatically
 ```
 
@@ -106,6 +106,86 @@ Delete `src/main.zig` and add `.c` / `.cpp` / `.cc` / `.cxx` files to `src/`. Th
 
 Use `#include <kipr/wombat.h>` to access the KIPR API.
 
+### Library packages
+
+The root build auto-links dependency packages whose names start with `wombat_cc_lib_`. Each library package should expose:
+
+- artifact: `lib`
+- named lazy path: `include`
+
+This supports both local path dependencies and fetched libraries:
+
+```sh
+zig fetch --save=wombat_cc_lib_<name> <url>
+```
+
+#### Build contract for each library package
+
+Each `wombat_cc_lib_*` package should:
+
+1. Build and install a static library artifact named `lib`
+2. Export its public headers via `b.addNamedLazyPath("include", ...)`
+3. Accept `-Dtarget`, `-Doptimize`, and `-Dkipr_include` from the parent build
+
+Minimal `lib/<Name>/build.zig` template:
+
+```zig
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const kipr_include = b.option(std.Build.LazyPath, "kipr_include", "Path to KIPR headers") orelse
+        @panic("missing required build option: -Dkipr_include");
+
+    const lib = b.addLibrary(.{
+        .linkage = .static,
+        .name = "lib",
+        .root_module = b.createModule(.{
+            .root_source_file = null,
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .link_libcpp = true,
+        }),
+    });
+
+    lib.addIncludePath(b.path("include"));
+    lib.addIncludePath(kipr_include);
+    lib.addCSourceFiles(.{
+        .root = b.path("src"),
+        .files = &.{"MyLibrary.cpp"},
+        .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+    });
+
+    b.addNamedLazyPath("include", b.path("include"));
+    b.installArtifact(lib);
+}
+```
+
+#### Example: local library dependency
+
+Add to your root `build.zig.zon`:
+
+```zig
+.dependencies = .{
+    .wombat_cc_lib_drive_train = .{ .path = "lib/DriveTrain" },
+};
+```
+
+Then run:
+
+```sh
+zig build
+```
+
+#### Example: fetched library dependency
+
+```sh
+zig fetch --save=wombat_cc_lib_drive_train https://example.com/drive-train.tar.gz
+zig build
+```
+
 ### Mixed (Zig + C/C++)
 
 When `src/main.zig` exists, it becomes the entry point. Any C/C++ files in `src/` are still compiled and linked alongside the Zig code — useful for gradual migration or calling C helpers.
@@ -134,7 +214,7 @@ It performs two independent checks:
 
 #### 1. Template infrastructure sync
 
-Syncs build scripts, CI workflows, and documentation from the **latest tagged release** of the upstream [Project XBOT](https://github.com/cdenihan/Project-XBOT) template.
+Syncs build scripts, CI workflows, and documentation from the **latest tagged release** of the upstream template repository.
 
 **What gets synced:**
 - `build.zig`, `build/` — build configuration and tools
@@ -147,7 +227,7 @@ Syncs build scripts, CI workflows, and documentation from the **latest tagged re
 - `build.zig.zon` — your project name, version, and dependency pins
 - `README.md` — your project readme
 
-When changes are detected, the workflow opens a pull request on the `auto/sync-template` branch. The `.xbot-version` file tracks which template tag your project is based on.
+When changes are detected, the workflow opens a pull request on the `auto/sync-template` branch. The `.wombat-cc-version` file tracks which template tag your project is based on.
 
 #### 2. KIPR SDK dependency update
 

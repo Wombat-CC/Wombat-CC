@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
     const cpp_files = sources.cpp_files;
 
     // ── User executable ──────────────────────────────────────────────
-    const has_cpp = cpp_files.len > 0;
+    const has_cpp = cpp_files.len > 0 or hasLibraryDependencies(b);
 
     const exe = b.addExecutable(.{
         .name = "botball_user_program",
@@ -68,6 +68,7 @@ pub fn build(b: *std.Build) void {
     exe.addLibraryPath(kipr_lib);
     exe.addRPath(.{ .cwd_relative = "/usr/lib" });
     exe.linkSystemLibrary("kipr");
+    linkLibraryDependencies(b, exe, target, optimize, kipr_include);
 
     // Compile any C source files in src/
     if (c_files.len > 0) {
@@ -173,6 +174,37 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
         .c_files = c_files.toOwnedSlice(b.allocator) catch &.{},
         .cpp_files = cpp_files.toOwnedSlice(b.allocator) catch &.{},
     };
+}
+
+const lib_dep_prefix = "wombat_cc_lib_";
+
+fn hasLibraryDependencies(b: *std.Build) bool {
+    for (b.available_deps) |dep| {
+        if (std.mem.startsWith(u8, dep[0], lib_dep_prefix)) return true;
+    }
+    return false;
+}
+
+fn linkLibraryDependencies(
+    b: *std.Build,
+    exe: *std.Build.Step.Compile,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    kipr_include: std.Build.LazyPath,
+) void {
+    for (b.available_deps) |dep| {
+        const dep_name = dep[0];
+        if (!std.mem.startsWith(u8, dep_name, lib_dep_prefix)) continue;
+
+        const lib_dep = b.lazyDependency(dep_name, .{
+            .target = target,
+            .optimize = optimize,
+            .kipr_include = kipr_include,
+        }) orelse continue;
+
+        exe.addIncludePath(lib_dep.namedLazyPath("include"));
+        exe.linkLibrary(lib_dep.artifact("lib"));
+    }
 }
 
 fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void {
