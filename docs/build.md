@@ -108,7 +108,7 @@ Use `#include <kipr/wombat.h>` to access the KIPR API.
 
 ### Library packages
 
-The root build auto-links dependency packages whose names start with `wombat_cc_lib_`. Each library package should expose:
+The root build auto-links any dependency whose key (the name used under `.dependencies` in `build.zig.zon` or with `--save=...`) starts with `wombat_cc_lib_`. Each library package should expose:
 
 - artifact: `lib`
 - named lazy path: `include`
