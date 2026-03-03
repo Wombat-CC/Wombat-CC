@@ -70,7 +70,9 @@ Delete `src/main.zig` and place `.c`, `.cpp`, `.cc`, or `.cxx` files in `src/`. 
 
 ### Libraries via `zig fetch` (C, C++, Zig)
 
-You can fetch helper libraries as Zig package dependencies and use them directly.
+You can fetch helper libraries as Zig package dependencies and use them directly in **Zig**, **C**, or **C++** projects.
+
+> All dependency compilation is performed by Zig's build graph (no CMake/Make), so the workflow stays cross-platform on Windows/macOS/Linux.
 
 1. Fetch and save the dependency in `build.zig.zon`:
 
@@ -78,13 +80,18 @@ You can fetch helper libraries as Zig package dependencies and use them directly
 zig fetch --save=wombat_drivetrain https://github.com/cdenihan/Wombat-DriveTrain/archive/refs/heads/main.tar.gz
 ```
 
-2. Use the library in your code:
+2. Use the library in your code.
+
+For a Zig library dependency:
 
 ```zig
 // Zig library (project created with `zig init`)
 const drivetrain = @import("wombat_drivetrain");
+```
 
-// C/C++ library header from include/
+For a C/C++ library dependency:
+
+```zig
 const drivetrain_c = @cImport({
     @cInclude("your_library_header.h");
 });
@@ -92,27 +99,53 @@ const drivetrain_c = @cImport({
 
 3. Build normally with `zig build`.
 
-Project XBOT automatically detects all non-`wombat_os` dependencies and:
-- imports Zig modules whose dependency `build.zig` exports a module with the same name as the dependency key
-- compiles and links C/C++ files found in `src/`
-- adds `include/` and `src/` as include paths for those C/C++ libraries
+#### Detailed integration behavior
 
-Expected library layouts:
+At build time, Project XBOT reads all dependencies in `build.zig.zon` (except `wombat_os`) and:
+
+1. **Zig module wiring**
+   - If a dependency exports a module whose name matches the dependency key, it is imported via `@import("<dependency_key>")`.
+2. **C/C++ source discovery**
+   - If dependency `src/` contains `.c`, `.cpp`, `.cc`, or `.cxx`, those files are discovered automatically.
+3. **Zig-built static library creation**
+   - Project XBOT compiles each C/C++ dependency into its own static library using Zig (`b.addLibrary(..., .linkage = .static)`), then links it into your program.
+4. **Include path setup**
+   - `include/` and `src/` are added so headers can be included from your app sources.
+5. **C++ runtime handling**
+   - libc++ is linked only when C++ sources are present (in your app or dependencies).
+
+#### Supported dependency layouts
+
+Zig library (recommended: `zig init` style):
 
 ```text
-# Zig library (`zig init`)
 <library>/
 ├── build.zig
 └── src/
     └── root.zig
+```
 
-# C/C++ library
+C/C++ library:
+
+```text
 <library>/
 ├── include/
 └── src/  # .c/.cpp/.cc/.cxx
 ```
 
-Zig's package/build cache keeps dependency fetches and compilation incremental, so rebuilds stay fast.
+#### Project-language compatibility
+
+- **Zig project (`src/main.zig`)**: can use `@import("<dep>")` and/or `@cImport` headers from fetched libraries.
+- **C project (`src/main.c`)**: can include dependency headers from `include/` and link against the Zig-built static dependency libs automatically.
+- **C++ project (`src/main.cpp/.cc/.cxx`)**: same as C, with automatic libc++ support when needed.
+
+#### Caching and speed
+
+Builds stay fast because Zig caches both:
+- dependency downloads (`zig fetch` package cache)
+- compiled outputs (including per-dependency static libraries)
+
+Only changed inputs are rebuilt.
 
 ## How It Works
 

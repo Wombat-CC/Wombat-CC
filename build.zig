@@ -102,22 +102,39 @@ pub fn build(b: *std.Build) void {
         if (lib.c_files.len > 0 or lib.cpp_files.len > 0) {
             exe.addIncludePath(lib.include_root);
             exe.addIncludePath(lib.src_root);
-        }
-
-        if (lib.c_files.len > 0) {
-            exe.addCSourceFiles(.{
-                .root = lib.src_root,
-                .files = lib.c_files,
-                .flags = &.{ "-std=c11", "-Wall", "-Wextra" },
+            const dep_static = b.addLibrary(.{
+                .linkage = .static,
+                .name = b.fmt("{s}_lib", .{lib.name}),
+                .root_module = b.createModule(.{
+                    .target = target,
+                    .optimize = optimize,
+                    .link_libc = true,
+                    .link_libcpp = if (lib.cpp_files.len > 0) true else null,
+                }),
             });
-        }
 
-        if (lib.cpp_files.len > 0) {
-            exe.addCSourceFiles(.{
-                .root = lib.src_root,
-                .files = lib.cpp_files,
-                .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
-            });
+            dep_static.addIncludePath(kipr_include);
+            dep_static.addIncludePath(lib.include_root);
+            dep_static.addIncludePath(lib.src_root);
+            if (lib.cpp_files.len > 0) dep_static.linkLibCpp();
+
+            if (lib.c_files.len > 0) {
+                dep_static.addCSourceFiles(.{
+                    .root = lib.src_root,
+                    .files = lib.c_files,
+                    .flags = &.{ "-std=c11", "-Wall", "-Wextra" },
+                });
+            }
+
+            if (lib.cpp_files.len > 0) {
+                dep_static.addCSourceFiles(.{
+                    .root = lib.src_root,
+                    .files = lib.cpp_files,
+                    .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
+                });
+            }
+
+            exe.linkLibrary(dep_static);
         }
     }
 

@@ -108,7 +108,9 @@ Use `#include <kipr/wombat.h>` to access the KIPR API.
 
 ### Libraries fetched with Zig (C, C++, Zig)
 
-Project XBOT supports library dependencies fetched through Zig packages.
+Project XBOT supports external libraries fetched with Zig packages and consumed from Zig, C, or C++ app code.
+
+All library compilation is handled by Zig's native build graph — no CMake/Make or platform-specific shell tooling.
 
 #### Add a library dependency
 
@@ -120,7 +122,7 @@ This adds the dependency to `build.zig.zon`.
 
 #### Library package format
 
-For automatic integration, use one of these layouts:
+For automatic integration, use one (or both) of these layouts:
 
 ```text
 # Zig library (created with `zig init`)
@@ -135,6 +137,8 @@ For automatic integration, use one of these layouts:
 └── src/              # .c/.cpp/.cc/.cxx sources
 ```
 
+You can also have mixed dependencies (for example: a Zig module plus C/C++ sources in the same package).
+
 #### What the build does automatically
 
 During `zig build`, Project XBOT:
@@ -142,13 +146,16 @@ During `zig build`, Project XBOT:
 1. Reads dependencies from `build.zig.zon`
 2. Skips the special `wombat_os` SDK dependency
 3. For each remaining dependency:
-   - imports the Zig module when the dependency's `build.zig` exports a module with the same name as the dependency key
-   - scans `src/` for `.c`, `.cpp`, `.cc`, `.cxx`
+   - imports the Zig module when the dependency exports a module with the same name as the dependency key
+   - scans dependency `src/` for `.c`, `.cpp`, `.cc`, `.cxx`
    - adds `include/` and `src/` to include paths
-   - compiles and links all discovered C/C++ sources
+   - compiles those C/C++ files into a Zig-built static library for the current target
+   - links that static library into your application
 4. Links libc++ only when any C++ sources are present
 
-#### Using fetched libraries in Zig
+This design guarantees target compatibility for cross-compilation (for example, building `aarch64-linux-gnu` artifacts from macOS/Windows/Linux hosts).
+
+#### Using fetched libraries in Zig projects (`src/main.zig`)
 
 Import Zig modules and C headers directly:
 
@@ -162,12 +169,62 @@ const mylib_c = @cImport({
 
 Then call APIs as usual (`mylib.someFunction(...)` or `mylib_c.some_function(...)`).
 
+#### Using fetched libraries in C/C++ projects (`src/main.c/.cpp`)
+
+If your app entrypoint is C or C++, just include dependency headers normally:
+
+```cpp
+#include <DriveTrain.hpp>
+
+int main() {
+    DriveTrain dt(0, 1);
+    dt.stop();
+    return 0;
+}
+```
+
+Project XBOT automatically links the dependency implementation, so no extra linker flags are needed.
+
+#### Naming and module conventions (important)
+
+- The dependency key used in `zig fetch --save=<key> ...` is the import name in Zig (`@import("<key>")`).
+- For Zig-module auto-import, dependency build metadata should export a module matching that key.
+- C/C++ dependencies should expose public headers in `include/` and implementation in `src/`.
+
+#### Verified example: `Wombat-DriveTrain`
+
+The following dependency has been validated with this build flow:
+
+```sh
+zig fetch --save=wombat_drivetrain https://github.com/cdenihan/Wombat-DriveTrain/archive/refs/heads/main.tar.gz
+```
+
+It is consumed as a C++ library (header in `include/DriveTrain.hpp`, implementation in `src/DriveTrain.cpp`) and is compiled/linked by Zig during the app build.
+
 #### Performance and caching
 
 No CMake/Make tooling is used. Everything is integrated through Zig's native build graph, which keeps builds fast and cross-platform:
 - Package downloads are cached by Zig package manager
-- Compiled artifacts are cached in Zig build cache
+- Compiled artifacts (including per-dependency static libraries) are cached in Zig build cache
 - Rebuilds are incremental and only recompile changed inputs
+
+#### Troubleshooting library integration
+
+##### `@import("<dep>")` fails
+
+The dependency may not export a Zig module with the same key name. Confirm dependency build metadata/module naming.
+
+##### Header not found (C/C++)
+
+Ensure the dependency has headers under `include/` (or update includes to match actual header paths).
+
+##### Undefined symbols at link time
+
+Confirm the dependency implementation files are present in `src/` and match declared headers.
+
+##### Build works on host but fails cross-target
+
+Avoid prebuilt host-specific artifacts; rely on source-based dependency builds (the default in Project XBOT) so Zig compiles for the requested target.
 
 ### Mixed (Zig + C/C++)
 
