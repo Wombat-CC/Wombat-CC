@@ -169,7 +169,7 @@ Add to your root `build.zig.zon`:
 
 ```zig
 .dependencies = .{
-    .wombat_cc_lib_drive_train = .{ .path = "lib/DriveTrain" },
+    .wombat_cc_lib_drivetrain = .{ .path = "lib/Drivetrain" },
 };
 ```
 
@@ -182,7 +182,7 @@ zig build
 #### Example: fetched library dependency
 
 ```sh
-zig fetch --save=wombat_cc_lib_drive_train https://example.com/drive-train.tar.gz
+zig fetch --save=wombat_cc_lib_drivetrain https://example.com/drive-train.tar.gz
 zig build
 ```
 
