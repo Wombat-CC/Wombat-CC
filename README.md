@@ -99,6 +99,11 @@ const drivetrain_c = @cImport({
 
 3. Build normally with `zig build`.
 
+4. See a committed, compile-verified usage example in:
+   - `src/library_usage_example.cpp` (uses `DriveTrain` from `wombat_drivetrain`)
+5. For clone-based local usage (no `zig fetch` required), clone the library to `lib/Wombat-DriveTrain/`.
+   Project XBOT automatically compiles `lib/<name>/src/*.c|*.cpp` and adds `lib/<name>/include` headers.
+
 #### Detailed integration behavior
 
 At build time, Project XBOT reads all dependencies in `build.zig.zon` (except `wombat_os`) and:

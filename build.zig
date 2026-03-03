@@ -206,19 +206,28 @@ fn collectLibraries(b: *std.Build) []const LibraryDependency {
 
     for (b.available_deps) |dep_info| {
         const dep_name = dep_info[0];
+        const dep_hash = dep_info[1];
         if (std.mem.eql(u8, dep_name, "wombat_os")) continue;
 
-        const dep = b.lazyDependency(dep_name, .{}) orelse continue;
-        const dep_sources = collectSources(b, dep.builder.pathFromRoot("src"));
-        const zig_module = dep.builder.modules.get(dep_name);
+        const dep_root = b.pathJoin(&.{ ".zig-cache", "p", dep_hash });
+        const dep_src = b.pathJoin(&.{ dep_root, "src" });
+        const dep_include = b.pathJoin(&.{ dep_root, "include" });
+        const dep_sources = collectSources(b, dep_src);
+        const dep_root_zig = b.pathJoin(&.{ dep_src, "root.zig" });
+        const zig_module = if (fileExists(dep_root_zig))
+            b.createModule(.{
+                .root_source_file = .{ .cwd_relative = dep_root_zig },
+            })
+        else
+            null;
         if (dep_sources.c_files.len == 0 and dep_sources.cpp_files.len == 0 and zig_module == null) continue;
 
         libs.append(
             b.allocator,
             .{
                 .name = dep_name,
-                .include_root = dep.path("include"),
-                .src_root = dep.path("src"),
+                .include_root = .{ .cwd_relative = dep_include },
+                .src_root = .{ .cwd_relative = dep_src },
                 .c_files = dep_sources.c_files,
                 .cpp_files = dep_sources.cpp_files,
                 .zig_module = zig_module,
@@ -226,7 +235,42 @@ fn collectLibraries(b: *std.Build) []const LibraryDependency {
         ) catch @panic("OOM");
     }
 
+    appendClonedLibraries(b, &libs);
+
     return libs.toOwnedSlice(b.allocator) catch &.{};
+}
+
+fn appendClonedLibraries(b: *std.Build, libs: *std.ArrayList(LibraryDependency)) void {
+    var lib_dir = std.fs.cwd().openDir("lib", .{ .iterate = true }) catch return;
+    defer lib_dir.close();
+
+    var it = lib_dir.iterate();
+    while (it.next() catch null) |entry| {
+        if (entry.kind != .directory) continue;
+
+        const root = b.pathJoin(&.{ "lib", entry.name });
+        const src_path = b.pathJoin(&.{ root, "src" });
+        const include_path = b.pathJoin(&.{ root, "include" });
+        const sources = collectSources(b, src_path);
+        if (sources.c_files.len == 0 and sources.cpp_files.len == 0) continue;
+
+        libs.append(
+            b.allocator,
+            .{
+                .name = b.allocator.dupe(u8, entry.name) catch @panic("OOM"),
+                .include_root = .{ .cwd_relative = include_path },
+                .src_root = .{ .cwd_relative = src_path },
+                .c_files = sources.c_files,
+                .cpp_files = sources.cpp_files,
+                .zig_module = null,
+            },
+        ) catch @panic("OOM");
+    }
+}
+
+fn fileExists(path: []const u8) bool {
+    std.fs.cwd().access(path, .{}) catch return false;
+    return true;
 }
 
 /// Scan `dir_path` once for `main.zig`, C, and C++ source files.

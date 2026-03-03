@@ -185,6 +185,11 @@ int main() {
 
 Project XBOT automatically links the dependency implementation, so no extra linker flags are needed.
 
+Committed example in this repository:
+- `src/library_usage_example.cpp` demonstrates basic `DriveTrain` construction/configuration from `wombat_drivetrain`.
+- Clone-based local library flow is also supported: clone the library into `lib/Wombat-DriveTrain/` and run `zig build`.
+  The build automatically compiles `lib/<name>/src` and adds `lib/<name>/include`.
+
 #### Naming and module conventions (important)
 
 - The dependency key used in `zig fetch --save=<key> ...` is the import name in Zig (`@import("<key>")`).
