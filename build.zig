@@ -47,7 +47,8 @@ pub fn build(b: *std.Build) void {
     const cpp_files = sources.cpp_files;
 
     // ── User executable ──────────────────────────────────────────────
-    const has_cpp = cpp_files.len > 0 or hasLibraryDependencies(b);
+    const has_cpp_sources = cpp_files.len > 0;
+    const needs_libcpp = has_cpp_sources or hasLibraryDependencies(b);
 
     const exe = b.addExecutable(.{
         .name = "botball_user_program",
@@ -59,7 +60,7 @@ pub fn build(b: *std.Build) void {
             // libc++ is only linked when C++ source files are present,
             // keeping pure-Zig builds as static as possible.
             .link_libc = true,
-            .link_libcpp = if (has_cpp) true else null,
+            .link_libcpp = if (needs_libcpp) true else null,
         }),
     });
 
@@ -80,7 +81,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // Link C++ source files (already collected above)
-    if (has_cpp) {
+    if (has_cpp_sources) {
         exe.addCSourceFiles(.{
             .root = b.path("src"),
             .files = cpp_files,

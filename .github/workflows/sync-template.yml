@@ -118,7 +118,7 @@ jobs:
                   commit-message: "chore: sync template infrastructure (${{ env.TEMPLATE_REF }})"
                   body: |
                       Automated sync of infrastructure files from the upstream
-                      [Wombat CC](https://github.com/cdenihan/Project-XBOT) template.
+                      [Wombat CC](https://github.com/cdenihan/Wombat-CC) template.
 
                       **Template version:** `${{ env.TEMPLATE_REF }}` (`${{ env.TEMPLATE_SHA }}`)
 

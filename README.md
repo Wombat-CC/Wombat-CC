@@ -89,7 +89,7 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 
 ## Library Packages
 
-The root build auto-links library dependencies whose package names start with `wombat_cc_lib_`. Each such dependency is expected to provide:
+The root build auto-links library dependencies whose `build.zig.zon` dependency keys (entry names) start with `wombat_cc_lib_`. Each such dependency is expected to provide:
 
 - artifact name: `lib`
 - named lazy path: `include`

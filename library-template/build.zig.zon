@@ -1,5 +1,5 @@
 .{
-    .name = .wombat_cc_library_template,
+    .name = .wombat_cc_lib_library_template,
     .version = "0.1.0",
     .minimum_zig_version = "0.15.0",
     .paths = .{
