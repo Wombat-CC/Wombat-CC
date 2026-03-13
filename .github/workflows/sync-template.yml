@@ -184,7 +184,7 @@ jobs:
                     echo "update=true" >> "$GITHUB_OUTPUT"
                   fi
 
-            - uses: mlugg/setup-zig@v2
+            - uses: mlugg/setup-zig@v2.2.1
               if: steps.check.outputs.update == 'true'
               with:
                   version: 0.15.2

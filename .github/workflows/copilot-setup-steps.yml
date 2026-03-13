@@ -9,4 +9,4 @@ jobs:
     # If you do not check out your code, Copilot will do this for you.
     steps:
       - name: Install Zig
-        uses: mlugg/setup-zig@v2
+        uses: mlugg/setup-zig@v2.2.1
