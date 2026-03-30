@@ -2,6 +2,8 @@
 
 Cross-compilation build system for the [KIPR Wombat](https://www.kipr.org/kipr/hardware-software/wombat) robot controller. Write your code in **Zig** (or C/C++) and produce an `aarch64-linux` binary that runs directly on the Wombat — no Docker required.
 
+> **Note:** This project isn't affiliated or endorsed by KIPR.
+
 ## Quick Start
 
 ### Prerequisites
