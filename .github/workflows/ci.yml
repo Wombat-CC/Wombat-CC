@@ -36,5 +36,17 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-zig-${{ env.ZIG_VERSION }}-
 
-            - name: Fast compile check (aarch64-linux, Debug)
+            - name: Fast compile check (template repo)
+              if: github.repository == 'Wombat-CC/Wombat-CC'
               run: zig build check -Doptimize=Debug -Dfast_ci=true
+
+            - name: Build (aarch64-linux, ReleaseFast)
+              if: github.repository != 'Wombat-CC/Wombat-CC'
+              run: zig build -Doptimize=ReleaseFast
+
+            - name: Upload build artifact
+              if: github.repository != 'Wombat-CC/Wombat-CC'
+              uses: actions/upload-artifact@v7
+              with:
+                  name: botball_user_program-${{ matrix.os }}
+                  path: zig-out/bin/botball_user_program

@@ -43,10 +43,12 @@ jobs:
                   git push origin "HEAD:$DEFAULT_BRANCH"
 
             - uses: mlugg/setup-zig@v2.2.1
+              if: github.repository != 'Wombat-CC/Wombat-CC'
               with:
                   version: ${{ env.ZIG_VERSION }}
 
             - name: Cache Zig build artifacts
+              if: github.repository != 'Wombat-CC/Wombat-CC'
               uses: actions/cache@v4
               with:
                   path: |
@@ -58,9 +60,19 @@ jobs:
                       ${{ runner.os }}-zig-${{ env.ZIG_VERSION }}-
 
             - name: Build (aarch64-linux, ReleaseFast)
+              if: github.repository != 'Wombat-CC/Wombat-CC'
               run: zig build -Doptimize=ReleaseFast
 
+            - name: Create Release (no binary for template repo)
+              if: github.repository == 'Wombat-CC/Wombat-CC'
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: ${{ github.ref_name }}
+                  draft: false
+                  prerelease: false
+
             - name: Create Release and Upload Binary
+              if: github.repository != 'Wombat-CC/Wombat-CC'
               uses: softprops/action-gh-release@v2
               with:
                   name: ${{ github.ref_name }}
