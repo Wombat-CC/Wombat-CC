@@ -17,19 +17,6 @@ jobs:
         steps:
             - uses: actions/checkout@v6
 
-            - name: Verify tagged version marker (template repo)
-              if: github.repository == 'Wombat-CC/Wombat-CC'
-              env:
-                  RELEASE_TAG: ${{ github.ref_name }}
-              run: |
-                  set -euo pipefail
-                  CURRENT_TAG_FILE="$(tr -d '\r\n' < .wombat-cc-version)"
-                  if [ "$CURRENT_TAG_FILE" != "$RELEASE_TAG" ]; then
-                    echo "::error::.wombat-cc-version ('$CURRENT_TAG_FILE') does not match pushed tag '$RELEASE_TAG'."
-                    echo "::error::Install/use the local pre-push release hook and re-push the tag."
-                    exit 1
-                  fi
-
             - uses: mlugg/setup-zig@v2.2.1
               if: github.repository != 'Wombat-CC/Wombat-CC'
               with:

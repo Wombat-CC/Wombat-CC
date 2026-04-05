@@ -100,33 +100,21 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 
 ## Tag Release Flow (Template Repo)
 
-For `Wombat-CC/Wombat-CC`, tag releases are hook-driven locally:
+For `Wombat-CC/Wombat-CC`, release versioning is manual.
 
-1. A local PowerShell `pre-push` hook syncs `.wombat-cc-version` to each pushed `v*` tag.
-2. The hook creates a local commit for the version bump.
-3. The hook retargets the local tag to that new commit.
-4. The hook pushes corrected refs automatically.
-5. The original push exits intentionally after correction (remote is already updated).
+Before creating a new tag, update `.wombat-cc-version` to match the release tag, commit that change, then tag and push.
 
-PowerShell (`pwsh`) is required on Windows, macOS, and Linux.
-
-One-time setup:
+Typical flow:
 
 ```sh
-git config core.hooksPath .githooks
-chmod +x .githooks/pre-push
-```
-
-Typical release push flow:
-
-```sh
+echo "vX.Y.Z" > .wombat-cc-version
+git add .wombat-cc-version
+git commit -m "chore: bump .wombat-cc-version to vX.Y.Z"
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
-git push origin vX.Y.Z
+git push origin main vX.Y.Z
 ```
 
-If the hook had to correct refs, you may see a non-zero exit for the original push command; this is expected because the hook already performed the corrected push.
-
-The GitHub release workflow no longer mutates tags. It only verifies that `.wombat-cc-version` matches the pushed tag for the template repo.
+The GitHub release workflow does not mutate version files or tags.
 
 ## Library Packages
 
