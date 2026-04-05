@@ -1,52 +1,79 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env pwsh
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
+$repoRoot = (& git rev-parse --show-toplevel).Trim()
+Set-Location -LiteralPath $repoRoot
 
-version_file=".wombat-cc-version"
-if [[ ! -f "$version_file" ]]; then
-  exit 0
-fi
+$versionFile = '.wombat-cc-version'
+if (-not (Test-Path -LiteralPath $versionFile)) {
+    exit 0
+}
 
-modified_refs=false
+$modifiedRefs = $false
+$deleteSha = '0000000000000000000000000000000000000000'
+$stdin = [Console]::In
 
 # Input lines are: <local_ref> <local_sha> <remote_ref> <remote_sha>
-while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
-  [[ -z "${local_ref:-}" ]] && continue
-
-  case "$local_ref" in
-    refs/tags/v*)
-      tag_name="${local_ref#refs/tags/}"
-
-      # Skip tag deletions.
-      if [[ "$local_sha" == "0000000000000000000000000000000000000000" ]]; then
+while (($line = $stdin.ReadLine()) -ne $null) {
+    if ([string]::IsNullOrWhiteSpace($line)) {
         continue
-      fi
+    }
 
-      current_version="$(tr -d '\r\n' < "$version_file")"
-      if [[ "$current_version" == "$tag_name" ]]; then
+    $parts = $line -split '\s+'
+    if ($parts.Count -lt 4) {
         continue
-      fi
+    }
 
-      echo "pre-push: syncing $version_file to $tag_name"
-      echo "$tag_name" > "$version_file"
-      git add "$version_file"
+    $localRef = $parts[0]
+    $localSha = $parts[1]
 
-      if ! git diff --cached --quiet -- "$version_file"; then
-        git -c commit.gpgsign=false commit --no-verify -m "chore: bump .wombat-cc-version to $tag_name" >/dev/null
-      fi
+    if (-not $localRef.StartsWith('refs/tags/v')) {
+        continue
+    }
 
-      new_sha="$(git rev-parse HEAD)"
-      git tag -f "$tag_name" "$new_sha" >/dev/null
-      modified_refs=true
-      ;;
-  esac
-done
+    # Skip tag deletions.
+    if ($localSha -eq $deleteSha) {
+        continue
+    }
 
-if [[ "$modified_refs" == true ]]; then
-  echo "pre-push: updated version marker and retargeted local tag(s)."
-  echo "pre-push: push cancelled intentionally so Git recalculates refs."
-  echo "pre-push: re-run your push command."
-  exit 1
-fi
+    $tagName = $localRef.Substring('refs/tags/'.Length)
+    $currentVersion = (Get-Content -LiteralPath $versionFile -Raw).Replace("`r", '').Replace("`n", '')
+    if ($currentVersion -eq $tagName) {
+        continue
+    }
+
+    Write-Host "pre-push: syncing $versionFile to $tagName"
+    Set-Content -LiteralPath $versionFile -Value $tagName
+    & git add -- $versionFile | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'pre-push: failed to stage version file update.'
+    }
+
+    & git diff --cached --quiet -- $versionFile
+    $hasDiff = $LASTEXITCODE -ne 0
+
+    if ($hasDiff) {
+        & git -c commit.gpgsign=false commit --no-verify -m "chore: bump .wombat-cc-version to $tagName" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'pre-push: failed to create version bump commit.'
+        }
+    }
+
+    $newSha = (& git rev-parse HEAD).Trim()
+    & git tag -f $tagName $newSha | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "pre-push: failed to retarget local tag '$tagName'."
+    }
+
+    $modifiedRefs = $true
+}
+
+if ($modifiedRefs) {
+    Write-Host 'pre-push: updated version marker and retargeted local tag(s).'
+    Write-Host 'pre-push: push cancelled intentionally so Git recalculates refs.'
+    Write-Host 'pre-push: re-run your push command.'
+    exit 1
+}
+
+exit 0

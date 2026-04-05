@@ -102,12 +102,14 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 
 For `Wombat-CC/Wombat-CC`, tag releases are hook-driven locally:
 
-1. A local `pre-push` hook syncs `.wombat-cc-version` to each pushed `v*` tag.
+1. A local PowerShell `pre-push` hook syncs `.wombat-cc-version` to each pushed `v*` tag.
 2. The hook creates a local commit for the version bump.
 3. The hook retargets the local tag to that new commit.
 4. The hook aborts the first push so you can re-run push with refreshed refs.
 
-One-time setup (already configured in this local clone):
+PowerShell (`pwsh`) is required on Windows, macOS, and Linux.
+
+One-time setup:
 
 ```sh
 git config core.hooksPath .githooks
