@@ -105,7 +105,8 @@ For `Wombat-CC/Wombat-CC`, tag releases are hook-driven locally:
 1. A local PowerShell `pre-push` hook syncs `.wombat-cc-version` to each pushed `v*` tag.
 2. The hook creates a local commit for the version bump.
 3. The hook retargets the local tag to that new commit.
-4. The hook aborts the first push so you can re-run push with refreshed refs.
+4. The hook pushes corrected refs automatically.
+5. The original push exits intentionally after correction (remote is already updated).
 
 PowerShell (`pwsh`) is required on Windows, macOS, and Linux.
 
@@ -120,9 +121,10 @@ Typical release push flow:
 
 ```sh
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
-git push origin vX.Y.Z   # first push is intentionally blocked by hook
-git push origin main vX.Y.Z
+git push origin vX.Y.Z
 ```
+
+If the hook had to correct refs, you may see a non-zero exit for the original push command; this is expected because the hook already performed the corrected push.
 
 The GitHub release workflow no longer mutates tags. It only verifies that `.wombat-cc-version` matches the pushed tag for the template repo.
 

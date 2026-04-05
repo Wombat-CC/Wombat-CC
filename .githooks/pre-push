@@ -2,8 +2,19 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Allow internal corrective pushes to bypass hook recursion.
+if ($env:WCC_SKIP_PREPUSH -eq '1') {
+    exit 0
+}
+
 $repoRoot = (& git rev-parse --show-toplevel).Trim()
 Set-Location -LiteralPath $repoRoot
+
+$remoteName = if ($args.Count -ge 1 -and -not [string]::IsNullOrWhiteSpace($args[0])) {
+    $args[0]
+} else {
+    'origin'
+}
 
 $versionFile = '.wombat-cc-version'
 if (-not (Test-Path -LiteralPath $versionFile)) {
@@ -11,6 +22,7 @@ if (-not (Test-Path -LiteralPath $versionFile)) {
 }
 
 $modifiedRefs = $false
+$updatedTags = [System.Collections.Generic.List[string]]::new()
 $deleteSha = '0000000000000000000000000000000000000000'
 $stdin = [Console]::In
 
@@ -66,13 +78,33 @@ while (($line = $stdin.ReadLine()) -ne $null) {
         throw "pre-push: failed to retarget local tag '$tagName'."
     }
 
+    if (-not $updatedTags.Contains($tagName)) {
+        $updatedTags.Add($tagName) | Out-Null
+    }
     $modifiedRefs = $true
 }
 
 if ($modifiedRefs) {
+    $branchName = (& git symbolic-ref --quiet --short HEAD 2>$null).Trim()
+
+    # Push corrected refs directly and bypass hook recursion.
+    if (-not [string]::IsNullOrWhiteSpace($branchName)) {
+        & git push --no-verify $remoteName $branchName | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "pre-push: failed to push branch '$branchName' to '$remoteName'."
+        }
+    }
+
+    foreach ($tagName in $updatedTags) {
+        & git push --no-verify --force-with-lease $remoteName "refs/tags/$tagName" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "pre-push: failed to push corrected tag '$tagName' to '$remoteName'."
+        }
+    }
+
     Write-Host 'pre-push: updated version marker and retargeted local tag(s).'
-    Write-Host 'pre-push: push cancelled intentionally so Git recalculates refs.'
-    Write-Host 'pre-push: re-run your push command.'
+    Write-Host 'pre-push: pushed corrected refs automatically.'
+    Write-Host 'pre-push: original push is cancelled intentionally; remote is already updated.'
     exit 1
 }
 
