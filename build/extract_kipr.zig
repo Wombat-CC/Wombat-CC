@@ -11,6 +11,7 @@
 const std = @import("std");
 const flate = std.compress.flate;
 const tar = std.tar;
+const Sha256 = std.crypto.hash.sha2.Sha256;
 
 // ── ar archive format ────────────────────────────────────────────────
 // Global header:  "!<arch>\n"  (8 bytes)
@@ -27,6 +28,19 @@ const ArEntry = struct {
 const Stamp = struct {
     size: u64,
     mtime: i128,
+};
+
+const CacheMissReason = enum {
+    output_missing,
+    required_files_missing,
+    hash_unavailable,
+    hash_mismatch,
+};
+
+const ReuseStatus = union(enum) {
+    metadata_hit,
+    hash_hit,
+    miss: CacheMissReason,
 };
 
 fn fileExists(dir: *std.fs.Dir, path: []const u8) bool {
@@ -63,17 +77,74 @@ fn writeStamp(dir: *std.fs.Dir, stamp: Stamp) !void {
     try file.writeAll(line);
 }
 
-fn reuseIfCurrent(out_path: []const u8, expected: Stamp) !bool {
-    var dir = std.fs.cwd().openDir(out_path, .{}) catch return false;
+fn loadHash(dir: *std.fs.Dir) !?[Sha256.digest_length]u8 {
+    const file = dir.openFile(".kipr-stamp-sha256", .{}) catch |err| switch (err) {
+        error.FileNotFound => return null,
+        else => return err,
+    };
+    defer file.close();
+
+    var buf: [Sha256.digest_length * 2 + 8]u8 = undefined;
+    const n = try file.readAll(&buf);
+    const trimmed = std.mem.trim(u8, buf[0..n], " \t\r\n");
+    if (trimmed.len != Sha256.digest_length * 2) return null;
+
+    var hash: [Sha256.digest_length]u8 = undefined;
+    _ = std.fmt.hexToBytes(&hash, trimmed) catch return null;
+    return hash;
+}
+
+fn writeHash(dir: *std.fs.Dir, hash: [Sha256.digest_length]u8) !void {
+    var file = try dir.createFile(".kipr-stamp-sha256", .{ .truncate = true });
+    defer file.close();
+
+    const encoded = std.fmt.bytesToHex(hash, .lower);
+    try file.writeAll(&encoded);
+    try file.writeAll("\n");
+}
+
+fn hashFileSha256(path: []const u8) ![Sha256.digest_length]u8 {
+    const file = try std.fs.cwd().openFile(path, .{});
+    defer file.close();
+
+    var hasher = Sha256.init(.{});
+    var buf: [64 * 1024]u8 = undefined;
+    while (true) {
+        const n = try file.read(&buf);
+        if (n == 0) break;
+        hasher.update(buf[0..n]);
+    }
+
+    var digest: [Sha256.digest_length]u8 = undefined;
+    hasher.final(&digest);
+    return digest;
+}
+
+fn missReasonText(reason: CacheMissReason) []const u8 {
+    return switch (reason) {
+        .output_missing => "no extracted SDK output directory exists yet",
+        .required_files_missing => "required SDK files are missing in output directory",
+        .hash_unavailable => "metadata changed and no cached SHA-256 stamp is available",
+        .hash_mismatch => "metadata changed and SDK package content hash changed",
+    };
+}
+
+fn reuseIfCurrent(deb_path: []const u8, out_path: []const u8, expected: Stamp) !ReuseStatus {
+    var dir = std.fs.cwd().openDir(out_path, .{}) catch return .{ .miss = .output_missing };
     defer dir.close();
 
-    const stamp = try loadStamp(&dir) orelse return false;
-    if (stamp.size != expected.size or stamp.mtime != expected.mtime) return false;
+    if (!fileExists(&dir, "usr/include/kipr/wombat.h")) return .{ .miss = .required_files_missing };
+    if (!fileExists(&dir, "usr/lib/libkipr.so")) return .{ .miss = .required_files_missing };
 
-    if (!fileExists(&dir, "usr/include/kipr/wombat.h")) return false;
-    if (!fileExists(&dir, "usr/lib/libkipr.so")) return false;
+    if (try loadStamp(&dir)) |stamp| {
+        if (stamp.size == expected.size and stamp.mtime == expected.mtime) return .metadata_hit;
+    }
 
-    return true;
+    const cached_hash = try loadHash(&dir) orelse return .{ .miss = .hash_unavailable };
+    const current_hash = try hashFileSha256(deb_path);
+    if (std.mem.eql(u8, cached_hash[0..], current_hash[0..])) return .hash_hit;
+
+    return .{ .miss = .hash_mismatch };
 }
 
 /// Walk the ar archive and return the first member whose name starts with
@@ -118,8 +189,28 @@ pub fn main() !void {
         .size = deb_stat.size,
         .mtime = deb_stat.mtime,
     };
+    std.log.info("extract_kipr: source package = {s} ({d} bytes)", .{ deb_path, expected_stamp.size });
 
-    if (try reuseIfCurrent(out_path, expected_stamp)) return;
+    switch (try reuseIfCurrent(deb_path, out_path, expected_stamp)) {
+        .metadata_hit => {
+            std.log.info("extract_kipr: reusing cached SDK (metadata match)", .{});
+            return;
+        },
+        .hash_hit => {
+            var out_dir = try std.fs.cwd().openDir(out_path, .{});
+            defer out_dir.close();
+            try writeStamp(&out_dir, expected_stamp);
+            std.log.info("extract_kipr: reusing cached SDK (content hash match)", .{});
+            return;
+        },
+        .miss => |reason| {
+            std.log.info("extract_kipr: cache miss: {s}", .{missReasonText(reason)});
+            std.log.info("extract_kipr: extracting SDK from package...", .{});
+        },
+    }
+
+    var extraction_timer = try std.time.Timer.start();
+    const deb_hash = try hashFileSha256(deb_path);
 
     std.fs.cwd().deleteTree(out_path) catch |err| {
         std.log.warn("extract_kipr: could not remove stale output '{s}': {}", .{ out_path, err });
@@ -154,4 +245,7 @@ pub fn main() !void {
 
     if (decompressor.err) |err| return err;
     try writeStamp(&out_dir, expected_stamp);
+    try writeHash(&out_dir, deb_hash);
+    const elapsed_ms = extraction_timer.read() / std.time.ns_per_ms;
+    std.log.info("extract_kipr: extraction complete in {d} ms", .{elapsed_ms});
 }

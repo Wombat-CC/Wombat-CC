@@ -36,6 +36,14 @@ Output: `zig-out/bin/botball_user_program`
 zig build -Doptimize=Debug
 ```
 
+### Fast Compile Check (no install)
+
+```sh
+zig build check -Doptimize=Debug -Dfast_ci=true
+```
+
+Useful for CI and quick validation loops where you only need compile/link success.
+
 ### Clean
 
 ```sh
@@ -54,6 +62,20 @@ Removes `zig-out/`, `zig-cache/`, and any extracted KIPR SDK cache created by th
 | `-Doptimize=ReleaseFast`   | Maximum performance (explicit)           |
 | `-Doptimize=ReleaseSmall`  | Optimized for binary size                |
 
+### Build Speed Options
+
+| Flag | Default | Effect |
+| ---- | ------- | ------ |
+| `-Dkipr_sdk_path=<path>` | unset | Skip SDK extraction and use an already-extracted SDK at `<path>/usr/include` and `<path>/usr/lib` |
+| `-Dfast_ci=true` | `false` | Favors compile-check throughput (used by `zig build check`) |
+| `-Daggressive_speed=true` | `false` | Reduces C/C++ diagnostics (`-w`) to maximize compile throughput |
+
+Recommended fast validation loop:
+
+```sh
+zig build check -Doptimize=Debug -Dfast_ci=true
+```
+
 ## How It Works
 
 On the first build, the Zig package manager downloads the pinned wombat-os release tarball (cached after first fetch). Then:
@@ -65,6 +87,13 @@ On the first build, the Zig package manager downloads the pinned wombat-os relea
 5. The binary is linked against `libkipr.so` for symbol resolution
 
 At runtime on the Wombat, `libkipr.so` is already installed at `/usr/lib/libkipr.so`.
+
+SDK extraction reuse is validated with a two-stage cache check:
+
+1. Fast metadata match (`size` + `mtime`)
+2. SHA-256 fallback when metadata changed (handles timestamp-only changes)
+
+This reduces redundant re-extraction while keeping cache reuse safe.
 
 ### Static vs Dynamic Linking
 

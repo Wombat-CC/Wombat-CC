@@ -25,15 +25,24 @@ zig build
 # Debug build
 zig build -Doptimize=Debug
 
+# Fast compile check (no install, CI-oriented)
+zig build check -Doptimize=Debug -Dfast_ci=true
+
 # Clean build outputs and cached SDK
 zig build clean
 ```
 
 The output binary is at `zig-out/bin/botball_user_program`.
 
+Speed-related build flags:
+
+- `-Dkipr_sdk_path=<path>`: use a pre-extracted SDK at `<path>/usr/include` and `<path>/usr/lib` (skips extraction)
+- `-Dfast_ci=true`: favors compile-validation throughput
+- `-Daggressive_speed=true`: reduces C/C++ diagnostics for faster C/C++ compilation
+
 ### Project Layout
 
-```
+```text
 your-project/
 ├── build.zig          # Build configuration (auto-fetches KIPR SDK)
 ├── build.zig.zon      # Package manifest (pins wombat-os version)
