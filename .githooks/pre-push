@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+version_file=".wombat-cc-version"
+if [[ ! -f "$version_file" ]]; then
+  exit 0
+fi
+
+modified_refs=false
+
+# Input lines are: <local_ref> <local_sha> <remote_ref> <remote_sha>
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  [[ -z "${local_ref:-}" ]] && continue
+
+  case "$local_ref" in
+    refs/tags/v*)
+      tag_name="${local_ref#refs/tags/}"
+
+      # Skip tag deletions.
+      if [[ "$local_sha" == "0000000000000000000000000000000000000000" ]]; then
+        continue
+      fi
+
+      current_version="$(tr -d '\r\n' < "$version_file")"
+      if [[ "$current_version" == "$tag_name" ]]; then
+        continue
+      fi
+
+      echo "pre-push: syncing $version_file to $tag_name"
+      echo "$tag_name" > "$version_file"
+      git add "$version_file"
+
+      if ! git diff --cached --quiet -- "$version_file"; then
+        git -c commit.gpgsign=false commit --no-verify -m "chore: bump .wombat-cc-version to $tag_name" >/dev/null
+      fi
+
+      new_sha="$(git rev-parse HEAD)"
+      git tag -f "$tag_name" "$new_sha" >/dev/null
+      modified_refs=true
+      ;;
+  esac
+done
+
+if [[ "$modified_refs" == true ]]; then
+  echo "pre-push: updated version marker and retargeted local tag(s)."
+  echo "pre-push: push cancelled intentionally so Git recalculates refs."
+  echo "pre-push: re-run your push command."
+  exit 1
+fi

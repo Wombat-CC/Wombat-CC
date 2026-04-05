@@ -98,6 +98,32 @@ zig fetch --save=wombat_os https://github.com/kipr/wombat-os/archive/refs/tags/<
 
 This updates the URL and content hash in `build.zig.zon`. The next build uses the new version.
 
+## Tag Release Flow (Template Repo)
+
+For `Wombat-CC/Wombat-CC`, tag releases are hook-driven locally:
+
+1. A local `pre-push` hook syncs `.wombat-cc-version` to each pushed `v*` tag.
+2. The hook creates a local commit for the version bump.
+3. The hook retargets the local tag to that new commit.
+4. The hook aborts the first push so you can re-run push with refreshed refs.
+
+One-time setup (already configured in this local clone):
+
+```sh
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-push
+```
+
+Typical release push flow:
+
+```sh
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z   # first push is intentionally blocked by hook
+git push origin main vX.Y.Z
+```
+
+The GitHub release workflow no longer mutates tags. It only verifies that `.wombat-cc-version` matches the pushed tag for the template repo.
+
 ## Library Packages
 
 The root build auto-links library dependencies whose `build.zig.zon` dependency keys (entry names) start with `wombat_cc_lib_`. Each such dependency is expected to provide:
