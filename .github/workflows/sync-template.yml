@@ -89,12 +89,24 @@ jobs:
 
                   # Infrastructure directories (adds/updates files; does not delete
                   # user-added files like custom workflows or extra docs)
-                  for d in build .github/workflows docs; do
+                  for d in build docs; do
                     if [ -d "/tmp/template/$d" ]; then
                       mkdir -p "$d"
                       cp -r "/tmp/template/$d/." "$d/"
                     fi
                   done
+
+                  # Updating workflow files requires a token with workflow scope.
+                  # Use a repository secret named WOMBAT_SYNC_TOKEN (classic PAT
+                  # with repo + workflow scopes, or equivalent fine-grained token)
+                  # to enable this path.
+                  if [ -n "${{ secrets.WOMBAT_SYNC_TOKEN }}" ] && [ -d "/tmp/template/.github/workflows" ]; then
+                    mkdir -p ".github/workflows"
+                    cp -r "/tmp/template/.github/workflows/." ".github/workflows/"
+                    echo "Synced .github/workflows using WOMBAT_SYNC_TOKEN credentials"
+                  else
+                    echo "::notice::Skipping .github/workflows sync (set WOMBAT_SYNC_TOKEN to enable workflow file updates)"
+                  fi
 
                   echo "$TEMPLATE_REF" > .wombat-cc-version
 
@@ -112,6 +124,7 @@ jobs:
               if: steps.resolve.outputs.ref != '' && steps.diff.outputs.changed == 'true'
               uses: peter-evans/create-pull-request@v8
               with:
+                  token: ${{ secrets.WOMBAT_SYNC_TOKEN || github.token }}
                   branch: auto/sync-template
                   delete-branch: true
                   title: "chore: sync template updates (${{ env.TEMPLATE_REF }})"
@@ -130,7 +143,7 @@ jobs:
                       ### Files synced
                       - `build.zig` — build configuration
                       - `build/` — build tools (SDK extractor)
-                      - `.github/workflows/` — CI, release, and sync workflows
+                      - `.github/workflows/` — CI, release, and sync workflows (when `WOMBAT_SYNC_TOKEN` is configured)
                       - `docs/` — documentation
                       - `.editorconfig`, `.envrc`, `.gitignore`, `flake.nix`, `flake.lock`
 
