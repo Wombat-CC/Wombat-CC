@@ -11,8 +11,9 @@ on:
                 default: ""
 
 permissions:
-    contents: write
-    pull-requests: write
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
     sync:
@@ -119,6 +120,143 @@ jobs:
                   else
                     echo "changed=true" >> "$GITHUB_OUTPUT"
                   fi
+
+            - name: Detect manual workflow sync need
+              if: steps.resolve.outputs.ref != ''
+              id: workflow_drift
+              run: |
+                  if [ -n "${{ secrets.WOMBAT_SYNC_TOKEN }}" ]; then
+                    echo "needs_issue=false" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
+                  CURRENT_DIR="/tmp/current-workflows"
+                  TEMPLATE_DIR="/tmp/template-workflows"
+                  mkdir -p "$CURRENT_DIR" "$TEMPLATE_DIR"
+
+                  if [ -d ".github/workflows" ]; then
+                    cp -r ".github/workflows/." "$CURRENT_DIR/"
+                  fi
+
+                  if [ -d "/tmp/template/.github/workflows" ]; then
+                    cp -r "/tmp/template/.github/workflows/." "$TEMPLATE_DIR/"
+                  fi
+
+                  if diff -qr "$CURRENT_DIR" "$TEMPLATE_DIR" > /tmp/workflow-diff.txt; then
+                    echo "needs_issue=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "needs_issue=true" >> "$GITHUB_OUTPUT"
+                    {
+                      echo "### Detected Differences"
+                      echo
+                      echo '```text'
+                      sed -n '1,200p' /tmp/workflow-diff.txt
+                      echo '```'
+                    } > /tmp/workflow-sync-diff.md
+                  fi
+
+            - name: Create or update manual workflow sync issue
+              if: steps.resolve.outputs.ref != '' && steps.workflow_drift.outputs.needs_issue == 'true'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const fs = require('fs');
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+                      const title = 'chore: manual sync needed for .github/workflows';
+
+                      let diffSection = '';
+                      try {
+                        diffSection = fs.readFileSync('/tmp/workflow-sync-diff.md', 'utf8');
+                      } catch {
+                        diffSection = '';
+                      }
+
+                      const ref = process.env.TEMPLATE_REF || 'latest';
+                      const sha = process.env.TEMPLATE_SHA || 'unknown';
+
+                      const body = [
+                        'The template sync workflow detected updates to `.github/workflows/` but this repository does not have `WOMBAT_SYNC_TOKEN` configured.',
+                        '',
+                        `Template version: \`${ref}\` (\`${sha}\`)`,
+                        '',
+                        '### How to update workflows manually',
+                        '1. Create a branch from `main`.',
+                        `2. Copy files from https://github.com/Wombat-CC/Wombat-CC/tree/${ref}/.github/workflows into this repo's .github/workflows/.`,
+                        '3. Commit and open a pull request.',
+                        '',
+                        'Optional terminal flow:',
+                        '```bash',
+                        `git clone --depth=1 --branch="${ref}" https://github.com/Wombat-CC/Wombat-CC.git /tmp/wombat-template`,
+                        'cp -r /tmp/wombat-template/.github/workflows/. .github/workflows/',
+                        'git checkout -b chore/manual-workflow-sync',
+                        'git add .github/workflows',
+                        `git commit -m "chore: sync workflows from template ${ref}"`,
+                        'git push -u origin chore/manual-workflow-sync',
+                        '```',
+                        '',
+                        diffSection,
+                        '',
+                        '_This issue is auto-managed by the Sync Template workflow._'
+                      ].join('\n');
+
+                      const { data: openIssues } = await github.rest.issues.listForRepo({
+                        owner,
+                        repo,
+                        state: 'open',
+                        per_page: 100,
+                      });
+
+                      const existing = openIssues.find((i) => i.title === title && !i.pull_request);
+
+                      if (existing) {
+                        await github.rest.issues.update({
+                          owner,
+                          repo,
+                          issue_number: existing.number,
+                          body,
+                        });
+                        core.info(`Updated issue #${existing.number}`);
+                      } else {
+                        const created = await github.rest.issues.create({
+                          owner,
+                          repo,
+                          title,
+                          body,
+                        });
+                        core.info(`Created issue #${created.data.number}`);
+                      }
+              env:
+                  TEMPLATE_REF: ${{ env.TEMPLATE_REF }}
+                  TEMPLATE_SHA: ${{ env.TEMPLATE_SHA }}
+
+            - name: Close manual workflow sync issue when not needed
+              if: steps.resolve.outputs.ref != '' && steps.workflow_drift.outputs.needs_issue == 'false'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const owner = context.repo.owner;
+                      const repo = context.repo.repo;
+                      const title = 'chore: manual sync needed for .github/workflows';
+
+                      const { data: openIssues } = await github.rest.issues.listForRepo({
+                        owner,
+                        repo,
+                        state: 'open',
+                        per_page: 100,
+                      });
+
+                      const existing = openIssues.find((i) => i.title === title && !i.pull_request);
+                      if (existing) {
+                        await github.rest.issues.update({
+                          owner,
+                          repo,
+                          issue_number: existing.number,
+                          state: 'closed',
+                          state_reason: 'completed',
+                        });
+                        core.info(`Closed issue #${existing.number}`);
+                      }
 
             - name: Create or update pull request
               if: steps.resolve.outputs.ref != '' && steps.diff.outputs.changed == 'true'
