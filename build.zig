@@ -140,8 +140,6 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
     b.default_step = b.getInstallStep();
-    const package_step = b.step("package", "Emit botball_user_program to zig-out/bin");
-    package_step.dependOn(b.getInstallStep());
     std.log.info("Build steps: default install emits zig-out/bin/botball_user_program; use 'check'/'ci' for compile-only", .{});
 
     // ── Run step ─────────────────────────────────────────────────────
