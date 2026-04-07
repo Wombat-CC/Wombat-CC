@@ -19,8 +19,11 @@ One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https
 ### Build
 
 ```sh
-# Production build (ReleaseFast, default)
+# Compile only (ReleaseFast, default)
 zig build
+
+# Emit deployable binary at zig-out/bin/botball_user_program
+zig build package
 
 # Debug build
 zig build -Doptimize=Debug
@@ -32,7 +35,7 @@ zig build check -Doptimize=Debug -Dfast_ci=true
 zig build clean
 ```
 
-The output binary is at `zig-out/bin/botball_user_program`.
+The deployable output binary is at `zig-out/bin/botball_user_program` when you run `zig build package`.
 
 Speed-related build flags:
 

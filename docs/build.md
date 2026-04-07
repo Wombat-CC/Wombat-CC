@@ -22,10 +22,18 @@ direnv allow   # activates the Nix shell automatically
 
 ## Building
 
-### Default Build (ReleaseFast, aarch64-linux)
+### Default Build (compile-only, ReleaseFast, aarch64-linux)
 
 ```sh
 zig build
+```
+
+This compiles the program without running the install step.
+
+### Emit binary to `zig-out/bin`
+
+```sh
+zig build package
 ```
 
 Output: `zig-out/bin/botball_user_program`
@@ -43,6 +51,8 @@ zig build check -Doptimize=Debug -Dfast_ci=true
 ```
 
 Useful for CI and quick validation loops where you only need compile/link success.
+
+`zig build ci` is also available as a compile-only alias for CI-style usage.
 
 ### Clean
 
