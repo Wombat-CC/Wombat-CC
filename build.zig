@@ -135,9 +135,12 @@ pub fn build(b: *std.Build) void {
 
     const check_step = b.step("check", "Compile botball_user_program without installation");
     check_step.dependOn(&exe.step);
-    std.log.info("Build steps: 'check' compiles only; default install step emits zig-out/bin/botball_user_program", .{});
+    const ci_step = b.step("ci", "Alias for compile-only CI validation");
+    ci_step.dependOn(check_step);
 
     b.installArtifact(exe);
+    b.default_step = b.getInstallStep();
+    std.log.info("Build steps: default install emits zig-out/bin/botball_user_program; use 'check'/'ci' for compile-only", .{});
 
     // ── Run step ─────────────────────────────────────────────────────
     // Only define a `run` step when the build target matches the host.
@@ -149,7 +152,7 @@ pub fn build(b: *std.Build) void {
         tgt.abi == host.abi)
     {
         const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(b.getInstallStep());
+        run_cmd.step.dependOn(&exe.step);
         if (b.args) |args| run_cmd.addArgs(args);
         const run_step = b.step("run", "Run the executable");
         run_step.dependOn(&run_cmd.step);

@@ -44,6 +44,8 @@ zig build check -Doptimize=Debug -Dfast_ci=true
 
 Useful for CI and quick validation loops where you only need compile/link success.
 
+`zig build ci` is also available as a compile-only alias for CI-style usage.
+
 ### Clean
 
 ```sh
