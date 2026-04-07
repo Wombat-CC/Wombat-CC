@@ -137,12 +137,12 @@ pub fn build(b: *std.Build) void {
     check_step.dependOn(&exe.step);
     const ci_step = b.step("ci", "Alias for compile-only CI validation");
     ci_step.dependOn(check_step);
-    b.default_step = check_step;
-    std.log.info("Build steps: default='check' (compile only); use 'package' to emit zig-out/bin/botball_user_program", .{});
 
     b.installArtifact(exe);
+    b.default_step = b.getInstallStep();
     const package_step = b.step("package", "Emit botball_user_program to zig-out/bin");
     package_step.dependOn(b.getInstallStep());
+    std.log.info("Build steps: default install emits zig-out/bin/botball_user_program; use 'check'/'ci' for compile-only", .{});
 
     // ── Run step ─────────────────────────────────────────────────────
     // Only define a `run` step when the build target matches the host.
