@@ -102,15 +102,12 @@ This updates the URL and content hash in `build.zig.zon`. The next build uses th
 
 For `Wombat-CC/Wombat-CC`, release versioning is manual.
 
-Before creating a new tag, update `.wombat-cc-version` to match the release tag, commit that change, then tag and push.
+Use the maintainer-only PowerShell tag helper (not used by GitHub Actions and not part of downstream template sync) to update `.wombat-cc-version`, commit if needed, and create the annotated tag.
 
 Typical flow:
 
-```sh
-echo "vX.Y.Z" > .wombat-cc-version
-git add .wombat-cc-version
-git commit -m "chore: bump .wombat-cc-version to vX.Y.Z"
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
+```powershell
+./scripts/create-template-tag.ps1 --tag vX.Y.Z
 git push origin main vX.Y.Z
 ```
 
