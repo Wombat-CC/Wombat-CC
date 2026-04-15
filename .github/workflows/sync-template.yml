@@ -157,7 +157,7 @@ jobs:
 
             - name: Create or update manual workflow sync issue
               if: steps.resolve.outputs.ref != '' && steps.workflow_drift.outputs.needs_issue == 'true'
-              uses: actions/github-script@v8
+              uses: actions/github-script@v9
               with:
                   script: |
                       const fs = require('fs');
@@ -293,7 +293,7 @@ jobs:
 
             - name: Close manual workflow sync issue when not needed
               if: steps.resolve.outputs.ref != '' && steps.workflow_drift.outputs.needs_issue == 'false'
-              uses: actions/github-script@v8
+              uses: actions/github-script@v9
               with:
                   script: |
                       const owner = context.repo.owner;
