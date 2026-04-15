@@ -40,7 +40,7 @@ jobs:
 
             - name: Create Release (no binary for template repo)
               if: github.repository == 'Wombat-CC/Wombat-CC'
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   name: ${{ github.ref_name }}
                   draft: false
@@ -48,7 +48,7 @@ jobs:
 
             - name: Create Release and Upload Binary
               if: github.repository != 'Wombat-CC/Wombat-CC'
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   name: ${{ github.ref_name }}
                   draft: false
