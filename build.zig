@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
     });
     const requested_optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size");
     const optimize = requested_optimize orelse .ReleaseFast;
-    const kipr_sdk_path = b.option([]const u8, "kipr_sdk_path", "Path to a pre-extracted KIPR SDK root (contains usr/include and usr/lib); skips SDK extraction");
+    const kipr_sdk_path = b.option([]const u8, "kipr_sdk_path", "Path to a pre-extracted KIPR SDK root (supports include/lib or usr/include/usr/lib); skips SDK extraction");
     const fast_ci = b.option(bool, "fast_ci", "Favor compile-validation speed for CI checks") orelse false;
     const aggressive_speed = b.option(bool, "aggressive_speed", "Reduce C/C++ diagnostics to maximize compile throughput") orelse false;
     const fast_checks = fast_ci or aggressive_speed;
@@ -40,11 +40,22 @@ pub fn build(b: *std.Build) void {
     var kipr_lib: std.Build.LazyPath = undefined;
 
     if (kipr_sdk_path) |sdk_path| {
-        kipr_include = .{ .cwd_relative = b.fmt("{s}/usr/include", .{sdk_path}) };
-        kipr_lib = .{ .cwd_relative = b.fmt("{s}/usr/lib", .{sdk_path}) };
+        const io = b.graph.io;
+        const include_usr = b.pathJoin(&.{ sdk_path, "usr", "include" });
+        const lib_usr = b.pathJoin(&.{ sdk_path, "usr", "lib" });
+        const include_root = b.pathJoin(&.{ sdk_path, "include" });
+        const lib_root = b.pathJoin(&.{ sdk_path, "lib" });
+        const has_usr_layout = blk: {
+            std.Io.Dir.cwd().access(io, include_usr, .{}) catch break :blk false;
+            std.Io.Dir.cwd().access(io, lib_usr, .{}) catch break :blk false;
+            break :blk true;
+        };
+
+        kipr_include = .{ .cwd_relative = if (has_usr_layout) include_usr else include_root };
+        kipr_lib = .{ .cwd_relative = if (has_usr_layout) lib_usr else lib_root };
         std.log.info("SDK mode: external path ({s})", .{sdk_path});
-        std.log.info("SDK include path: {s}/usr/include", .{sdk_path});
-        std.log.info("SDK library path: {s}/usr/lib", .{sdk_path});
+        std.log.info("SDK include path: {s}", .{if (has_usr_layout) include_usr else include_root});
+        std.log.info("SDK library path: {s}", .{if (has_usr_layout) lib_usr else lib_root});
     } else {
         std.log.info("SDK mode: extracted from wombat_os package (cached between builds).", .{});
         const wombat_dep = b.dependency("wombat_os", .{});
@@ -61,8 +72,8 @@ pub fn build(b: *std.Build) void {
         extract_step.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
         const sdk_root = extract_step.addOutputDirectoryArg("kipr_sdk");
 
-        kipr_include = sdk_root.path(b, "usr/include");
-        kipr_lib = sdk_root.path(b, "usr/lib");
+        kipr_include = sdk_root.path(b, "include");
+        kipr_lib = sdk_root.path(b, "lib");
     }
 
     // ── Detect language mode and source files ────────────────────────
@@ -71,6 +82,20 @@ pub fn build(b: *std.Build) void {
     const has_zig_main = sources.has_zig_main;
     const c_files = sources.c_files;
     const cpp_files = sources.cpp_files;
+    const wombat_imports: []const std.Build.Module.Import = if (has_zig_main) blk: {
+        const translate_c = b.addTranslateC(.{
+            .root_source_file = b.path("src/wombat.h"),
+            .target = target,
+            .optimize = optimize,
+        });
+        translate_c.addIncludePath(kipr_include);
+        break :blk &.{
+            .{
+                .name = "wombat_c",
+                .module = translate_c.createModule(),
+            },
+        };
+    } else &.{};
     std.log.info("Source scan: main.zig={s}, C files={d}, C++ files={d}", .{
         if (has_zig_main) "yes" else "no",
         c_files.len,
@@ -88,6 +113,7 @@ pub fn build(b: *std.Build) void {
         .name = "botball_user_program",
         .root_module = b.createModule(.{
             .root_source_file = if (has_zig_main) b.path("src/main.zig") else null,
+            .imports = wombat_imports,
             .target = target,
             .optimize = optimize,
             // libc is always needed (libkipr.so depends on it).
@@ -99,10 +125,10 @@ pub fn build(b: *std.Build) void {
     });
 
     // KIPR SDK paths (extracted at build time)
-    exe.addIncludePath(kipr_include);
-    exe.addLibraryPath(kipr_lib);
-    exe.addRPath(.{ .cwd_relative = "/usr/lib" });
-    exe.linkSystemLibrary("kipr");
+    exe.root_module.addIncludePath(kipr_include);
+    exe.root_module.addLibraryPath(kipr_lib);
+    exe.root_module.addRPath(.{ .cwd_relative = "/usr/lib" });
+    exe.root_module.linkSystemLibrary("kipr", .{});
     linkLibraryDependencies(b, exe, target, optimize, kipr_include);
 
     const c_compile_flags: []const []const u8 = if (fast_checks)
@@ -117,7 +143,7 @@ pub fn build(b: *std.Build) void {
 
     // Compile any C source files in src/
     if (c_files.len > 0) {
-        exe.addCSourceFiles(.{
+        exe.root_module.addCSourceFiles(.{
             .root = b.path("src"),
             .files = c_files,
             .flags = c_compile_flags,
@@ -126,7 +152,7 @@ pub fn build(b: *std.Build) void {
 
     // Link C++ source files (already collected above)
     if (has_cpp_sources) {
-        exe.addCSourceFiles(.{
+        exe.root_module.addCSourceFiles(.{
             .root = b.path("src"),
             .files = cpp_files,
             .flags = cpp_compile_flags,
@@ -184,20 +210,21 @@ const SourceSet = struct {
 
 /// Scan `dir_path` once for `main.zig`, C, and C++ source files.
 fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
-    var c_files: std.ArrayList([]const u8) = .{};
-    var cpp_files: std.ArrayList([]const u8) = .{};
+    const io = b.graph.io;
+    var c_files: std.ArrayList([]const u8) = .empty;
+    var cpp_files: std.ArrayList([]const u8) = .empty;
     var has_zig_main = false;
 
-    var dir = std.fs.cwd().openDir(dir_path, .{ .iterate = true }) catch
+    var dir = std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true }) catch
         return .{
             .has_zig_main = false,
             .c_files = &.{},
             .cpp_files = &.{},
         };
-    defer dir.close();
+    defer dir.close(io);
 
     var it = dir.iterate();
-    while (it.next() catch null) |entry| {
+    while (it.next(io) catch null) |entry| {
         if (entry.kind != .file) continue;
         if (std.mem.eql(u8, entry.name, "main.zig")) has_zig_main = true;
 
@@ -264,15 +291,16 @@ fn linkLibraryDependencies(
             .kipr_include = kipr_include,
         }) orelse continue;
 
-        exe.addIncludePath(lib_dep.namedLazyPath("include"));
-        exe.linkLibrary(lib_dep.artifact("lib"));
+        exe.root_module.addIncludePath(lib_dep.namedLazyPath("include"));
+        exe.root_module.linkLibrary(lib_dep.artifact("lib"));
     }
 }
 
 fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void {
     _ = options;
     const b = step.owner;
-    const cwd = std.fs.cwd();
+    const io = b.graph.io;
+    const cwd = std.Io.Dir.cwd();
     const paths = [_][]const u8{
         "zig-out",
         ".zig-cache",
@@ -280,7 +308,7 @@ fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !v
     };
 
     for (paths) |path| {
-        cwd.deleteTree(path) catch {
+        cwd.deleteTree(io, path) catch {
             std.log.info("Clean: {s} (not present)", .{path});
             continue;
         };
@@ -288,5 +316,4 @@ fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !v
     }
 
     std.log.info("Clean complete.", .{});
-    _ = b; // unused for now; reserved for future cache-aware cleanups
 }

@@ -1,4 +1,0 @@
-#!/usr/bin/env pwsh
-# Intentionally disabled.
-# Release/tag version synchronization is manual.
-exit 0

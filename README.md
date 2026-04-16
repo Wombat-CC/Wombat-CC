@@ -10,9 +10,9 @@ Cross-compilation build system for the [KIPR Wombat](https://www.kipr.org/kipr/h
 
 | Platform    | Requirement                                  |
 | ----------- | -------------------------------------------- |
-| **Windows** | [Zig 0.15.2+](https://ziglang.org/download/) |
-| **macOS**   | [Zig 0.15.2+](https://ziglang.org/download/) |
-| **Linux**   | [Zig 0.15.2+](https://ziglang.org/download/) |
+| **Windows** | [Zig 0.16.0+](https://ziglang.org/download/) |
+| **macOS**   | [Zig 0.16.0+](https://ziglang.org/download/) |
+| **Linux**   | [Zig 0.16.0+](https://ziglang.org/download/) |
 
 One tool, all platforms. Optionally, Linux and macOS users can use **[Nix](https://nixos.org/download.html)** + **[direnv](https://direnv.net/)** for a fully reproducible environment.
 
@@ -36,7 +36,7 @@ The output binary is at `zig-out/bin/botball_user_program`.
 
 Speed-related build flags:
 
-- `-Dkipr_sdk_path=<path>`: use a pre-extracted SDK at `<path>/usr/include` and `<path>/usr/lib` (skips extraction)
+- `-Dkipr_sdk_path=<path>`: use a pre-extracted SDK at `<path>/include` + `<path>/lib` (or `<path>/usr/include` + `<path>/usr/lib`) and skip extraction
 - `-Dfast_ci=true`: favors compile-validation throughput
 - `-Daggressive_speed=true`: reduces C/C++ diagnostics for faster C/C++ compilation
 
@@ -60,11 +60,11 @@ your-project/
 
 ### Zig (default)
 
-Write your robot code in `src/main.zig`. The KIPR API bindings are **generated automatically** from the C headers at compile time via `@cImport` — as libwallaby evolves, the bindings evolve with it:
+Write your robot code in `src/main.zig`. The KIPR API bindings are **generated automatically** by the build system via `translate-c` — as libwallaby evolves, the bindings evolve with it:
 
 ```zig
 const std = @import("std");
-const wombat = @cImport(@cInclude("kipr/wombat.h"));
+const wombat = @import("wombat_c");
 
 pub fn main() void {
     std.debug.print("Hello from Zig!\n", .{});
@@ -161,9 +161,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    lib.addIncludePath(b.path("include"));
-    lib.addIncludePath(kipr_include);
-    lib.addCSourceFiles(.{
+    lib.root_module.addIncludePath(b.path("include"));
+    lib.root_module.addIncludePath(kipr_include);
+    lib.root_module.addCSourceFiles(.{
         .root = b.path("src"),
         .files = &.{"Arm.cpp"},
         .flags = &.{ "-std=c++17", "-Wall", "-Wextra" },
@@ -202,7 +202,7 @@ int main() {
 
 #### Zig entrypoint (`src/main.zig`)
 
-Zig cannot call C++ classes directly from headers. To use Drivetrain/Arm from Zig, add a small C API wrapper in a dependency, then import that C header in Zig.
+Zig cannot call C++ classes directly from headers. To use Drivetrain/Arm from Zig, add a small C API wrapper in a dependency, then import it through a build-provided `translate-c` module.
 
 Wrapper header example (`drivetrain_c_api.h`):
 
@@ -214,10 +214,12 @@ void drivetrain_set_performance(DrivetrainHandle* handle, double flp, double frp
 void drivetrain_drive_forward_line_tracking(DrivetrainHandle* handle, int ticks, int speed);
 ```
 
+In your build script, add a `b.addTranslateC(...)` step for this header and import it as `drivetrain_c` (same pattern as `wombat_c`).
+
 Zig usage:
 
 ```zig
-const dt = @cImport(@cInclude("drivetrain_c_api.h"));
+const dt = @import("drivetrain_c");
 
 pub fn main() void {
     const drive = dt.drivetrain_create(0, 1, 2, 3, 0, 1);
