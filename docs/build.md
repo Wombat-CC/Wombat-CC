@@ -69,6 +69,7 @@ Removes `zig-out/`, `zig-cache/`, and any extracted KIPR SDK cache created by th
 | Flag | Default | Effect |
 | ---- | ------- | ------ |
 | `-Dkipr_sdk_path=<path>` | unset | Skip SDK extraction and use an already-extracted SDK at `<path>/include` + `<path>/lib` (or `<path>/usr/include` + `<path>/usr/lib`) |
+| `-Dsdk_cache_path=<path>` | `.wombat-sdk-cache/kipr_sdk` | Location for extracted SDK cache when `-Dkipr_sdk_path` is not set |
 | `-Dfast_ci=true` | `false` | Favors compile-check throughput (used by `zig build check`) |
 | `-Daggressive_speed=true` | `false` | Reduces C/C++ diagnostics (`-w`) to maximize compile throughput |
 
@@ -331,6 +332,8 @@ From the Actions tab, select *Sync Template* → *Run workflow* and optionally p
 The first build downloads the wombat-os tarball (~50 MB). Subsequent builds use the Zig package cache.
 
 On Zig 0.16+, fetched packages are stored in `zig-pkg/` in the project directory. In CI, cache this directory alongside `.zig-cache/` and `zig-cache/` to avoid re-fetch/recompress work on each run.
+
+For local builds, extracted SDK files are cached in `.wombat-sdk-cache/kipr_sdk` by default to avoid repeated extraction work across build graph changes.
 
 ### Build fails with "Could not open source directory"
 

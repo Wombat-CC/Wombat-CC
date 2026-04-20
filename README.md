@@ -37,6 +37,7 @@ The output binary is at `zig-out/bin/botball_user_program`.
 Speed-related build flags:
 
 - `-Dkipr_sdk_path=<path>`: use a pre-extracted SDK at `<path>/include` + `<path>/lib` (or `<path>/usr/include` + `<path>/usr/lib`) and skip extraction
+- `-Dsdk_cache_path=<path>`: set where extracted SDK files are cached when auto-extraction is used (default: `.wombat-sdk-cache/kipr_sdk`)
 - `-Dfast_ci=true`: favors compile-validation throughput
 - `-Daggressive_speed=true`: reduces C/C++ diagnostics for faster C/C++ compilation
 

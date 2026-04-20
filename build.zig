@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     const requested_optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size");
     const optimize = requested_optimize orelse .ReleaseFast;
     const kipr_sdk_path = b.option([]const u8, "kipr_sdk_path", "Path to a pre-extracted KIPR SDK root (supports include/lib or usr/include/usr/lib); skips SDK extraction");
+    const sdk_cache_path = b.option([]const u8, "sdk_cache_path", "Path for extracted KIPR SDK cache when -Dkipr_sdk_path is not set") orelse ".wombat-sdk-cache/kipr_sdk";
     const fast_ci = b.option(bool, "fast_ci", "Favor compile-validation speed for CI checks") orelse false;
     const aggressive_speed = b.option(bool, "aggressive_speed", "Reduce C/C++ diagnostics to maximize compile throughput") orelse false;
     const fast_checks = fast_ci or aggressive_speed;
@@ -38,6 +39,7 @@ pub fn build(b: *std.Build) void {
     // or `tar` CLI needed, so this works on Windows, macOS, and Linux.
     var kipr_include: std.Build.LazyPath = undefined;
     var kipr_lib: std.Build.LazyPath = undefined;
+    var extract_step: ?*std.Build.Step.Run = null;
 
     if (kipr_sdk_path) |sdk_path| {
         const io = b.graph.io;
@@ -57,7 +59,7 @@ pub fn build(b: *std.Build) void {
         std.log.info("SDK include path: {s}", .{if (has_usr_layout) include_usr else include_root});
         std.log.info("SDK library path: {s}", .{if (has_usr_layout) lib_usr else lib_root});
     } else {
-        std.log.info("SDK mode: extracted from wombat_os package (cached between builds).", .{});
+        std.log.info("SDK mode: extracted from wombat_os package (cached at {s}).", .{sdk_cache_path});
         const wombat_dep = b.dependency("wombat_os", .{});
 
         const extractor = b.addExecutable(.{
@@ -68,12 +70,13 @@ pub fn build(b: *std.Build) void {
             }),
         });
 
-        const extract_step = b.addRunArtifact(extractor);
-        extract_step.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
-        const sdk_root = extract_step.addOutputDirectoryArg("kipr_sdk");
+        const run_extract = b.addRunArtifact(extractor);
+        run_extract.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
+        run_extract.addArg(sdk_cache_path);
+        extract_step = run_extract;
 
-        kipr_include = sdk_root.path(b, "include");
-        kipr_lib = sdk_root.path(b, "lib");
+        kipr_include = .{ .cwd_relative = b.pathJoin(&.{ sdk_cache_path, "include" }) };
+        kipr_lib = .{ .cwd_relative = b.pathJoin(&.{ sdk_cache_path, "lib" }) };
     }
 
     // ── Detect language mode and source files ────────────────────────
@@ -123,6 +126,7 @@ pub fn build(b: *std.Build) void {
             .link_libcpp = if (needs_libcpp) true else null,
         }),
     });
+    if (extract_step) |step| exe.step.dependOn(&step.step);
 
     // KIPR SDK paths (extracted at build time)
     exe.root_module.addIncludePath(kipr_include);
@@ -305,6 +309,7 @@ fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !v
         "zig-out",
         ".zig-cache",
         "zig-cache",
+        ".wombat-sdk-cache",
     };
 
     for (paths) |path| {
