@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     const requested_optimize = b.option(std.builtin.OptimizeMode, "optimize", "Prioritize performance, safety, or binary size");
     const optimize = requested_optimize orelse .ReleaseFast;
     const kipr_sdk_path = b.option([]const u8, "kipr_sdk_path", "Path to a pre-extracted KIPR SDK root (supports include/lib or usr/include/usr/lib); skips SDK extraction");
+    const sdk_cache_path = b.option([]const u8, "sdk_cache_path", "Path for extracted KIPR SDK cache when -Dkipr_sdk_path is not set") orelse ".wombat-sdk-cache/kipr_sdk";
     const fast_ci = b.option(bool, "fast_ci", "Favor compile-validation speed for CI checks") orelse false;
     const aggressive_speed = b.option(bool, "aggressive_speed", "Reduce C/C++ diagnostics to maximize compile throughput") orelse false;
     const fast_checks = fast_ci or aggressive_speed;
@@ -38,6 +39,7 @@ pub fn build(b: *std.Build) void {
     // or `tar` CLI needed, so this works on Windows, macOS, and Linux.
     var kipr_include: std.Build.LazyPath = undefined;
     var kipr_lib: std.Build.LazyPath = undefined;
+    var extract_step: ?*std.Build.Step.Run = null;
 
     if (kipr_sdk_path) |sdk_path| {
         const io = b.graph.io;
@@ -57,7 +59,7 @@ pub fn build(b: *std.Build) void {
         std.log.info("SDK include path: {s}", .{if (has_usr_layout) include_usr else include_root});
         std.log.info("SDK library path: {s}", .{if (has_usr_layout) lib_usr else lib_root});
     } else {
-        std.log.info("SDK mode: extracted from wombat_os package (cached between builds).", .{});
+        std.log.info("SDK mode: extracted from wombat_os package (cached at {s}).", .{sdk_cache_path});
         const wombat_dep = b.dependency("wombat_os", .{});
 
         const extractor = b.addExecutable(.{
@@ -68,12 +70,13 @@ pub fn build(b: *std.Build) void {
             }),
         });
 
-        const extract_step = b.addRunArtifact(extractor);
-        extract_step.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
-        const sdk_root = extract_step.addOutputDirectoryArg("kipr_sdk");
+        const run_extract = b.addRunArtifact(extractor);
+        run_extract.addFileArg(wombat_dep.path("updateFiles/pkgs/kipr.deb"));
+        run_extract.addArg(sdk_cache_path);
+        extract_step = run_extract;
 
-        kipr_include = sdk_root.path(b, "include");
-        kipr_lib = sdk_root.path(b, "lib");
+        kipr_include = .{ .cwd_relative = b.pathJoin(&.{ sdk_cache_path, "include" }) };
+        kipr_lib = .{ .cwd_relative = b.pathJoin(&.{ sdk_cache_path, "lib" }) };
     }
 
     // ── Detect language mode and source files ────────────────────────
@@ -89,6 +92,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         translate_c.addIncludePath(kipr_include);
+        if (extract_step) |step| translate_c.step.dependOn(&step.step);
         break :blk &.{
             .{
                 .name = "wombat_c",
@@ -104,7 +108,8 @@ pub fn build(b: *std.Build) void {
 
     // ── User executable ──────────────────────────────────────────────
     const has_cpp_sources = cpp_files.len > 0;
-    const library_dep_count = countLibraryDependencies(b);
+    const library_dep_names = collectLibraryDependencyNames(b);
+    const library_dep_count = library_dep_names.len;
     const needs_libcpp = has_cpp_sources or library_dep_count > 0;
     std.log.info("Detected wombat_cc_lib_* dependencies: {d}", .{library_dep_count});
     std.log.info("libc++ linkage: {s}", .{if (needs_libcpp) "enabled" else "disabled"});
@@ -123,13 +128,14 @@ pub fn build(b: *std.Build) void {
             .link_libcpp = if (needs_libcpp) true else null,
         }),
     });
+    if (extract_step) |step| exe.step.dependOn(&step.step);
 
     // KIPR SDK paths (extracted at build time)
     exe.root_module.addIncludePath(kipr_include);
     exe.root_module.addLibraryPath(kipr_lib);
     exe.root_module.addRPath(.{ .cwd_relative = "/usr/lib" });
     exe.root_module.linkSystemLibrary("kipr", .{});
-    linkLibraryDependencies(b, exe, target, optimize, kipr_include);
+    linkLibraryDependencies(b, exe, target, optimize, library_dep_names, kipr_include);
 
     const c_compile_flags: []const []const u8 = if (fast_checks)
         &.{ "-std=c11", "-w" }
@@ -248,6 +254,9 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
         ) catch @panic("OOM");
     }
 
+    std.sort.heap([]const u8, c_files.items, {}, lessThanStringSlices);
+    std.sort.heap([]const u8, cpp_files.items, {}, lessThanStringSlices);
+
     return .{
         .has_zig_main = has_zig_main,
         .c_files = c_files.toOwnedSlice(b.allocator) catch &.{},
@@ -256,6 +265,10 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
 }
 
 const lib_dep_prefix = "wombat_cc_lib_";
+
+fn lessThanStringSlices(_: void, lhs: []const u8, rhs: []const u8) bool {
+    return std.mem.order(u8, lhs, rhs) == .lt;
+}
 
 fn optimizeIntent(mode: std.builtin.OptimizeMode) []const u8 {
     return switch (mode) {
@@ -266,12 +279,17 @@ fn optimizeIntent(mode: std.builtin.OptimizeMode) []const u8 {
     };
 }
 
-fn countLibraryDependencies(b: *std.Build) usize {
-    var count: usize = 0;
+fn collectLibraryDependencyNames(b: *std.Build) []const []const u8 {
+    var dep_names: std.ArrayList([]const u8) = .empty;
     for (b.available_deps) |dep| {
-        if (std.mem.startsWith(u8, dep[0], lib_dep_prefix)) count += 1;
+        const dep_name = dep[0];
+        if (!std.mem.startsWith(u8, dep_name, lib_dep_prefix)) continue;
+
+        dep_names.append(b.allocator, dep_name) catch @panic("OOM");
     }
-    return count;
+
+    std.sort.heap([]const u8, dep_names.items, {}, lessThanStringSlices);
+    return dep_names.toOwnedSlice(b.allocator) catch &.{};
 }
 
 fn linkLibraryDependencies(
@@ -279,12 +297,10 @@ fn linkLibraryDependencies(
     exe: *std.Build.Step.Compile,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    library_dep_names: []const []const u8,
     kipr_include: std.Build.LazyPath,
 ) void {
-    for (b.available_deps) |dep| {
-        const dep_name = dep[0];
-        if (!std.mem.startsWith(u8, dep_name, lib_dep_prefix)) continue;
-
+    for (library_dep_names) |dep_name| {
         const lib_dep = b.lazyDependency(dep_name, .{
             .target = target,
             .optimize = optimize,
@@ -305,6 +321,7 @@ fn cleanArtifacts(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !v
         "zig-out",
         ".zig-cache",
         "zig-cache",
+        ".wombat-sdk-cache",
     };
 
     for (paths) |path| {
