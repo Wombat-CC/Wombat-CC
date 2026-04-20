@@ -330,6 +330,8 @@ From the Actions tab, select *Sync Template* → *Run workflow* and optionally p
 
 The first build downloads the wombat-os tarball (~50 MB). Subsequent builds use the Zig package cache.
 
+On Zig 0.16+, fetched packages are stored in `zig-pkg/` in the project directory. In CI, cache this directory alongside `.zig-cache/` and `zig-cache/` to avoid re-fetch/recompress work on each run.
+
 ### Build fails with "Could not open source directory"
 
 Ensure `src/` exists and contains at least one source file (`.zig`, `.c`, `.cpp`, `.cc`, or `.cxx`).
