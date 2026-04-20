@@ -31,6 +31,7 @@ jobs:
                   path: |
                       .zig-cache
                       zig-cache
+                      zig-pkg
                       ${{ runner.os == 'Windows' && '~\\AppData\\Local\\zig' || '~/.cache/zig' }}
                   key: ${{ runner.os }}-zig-${{ env.ZIG_VERSION }}-${{ hashFiles('build.zig', 'build.zig.zon', 'build/extract_kipr.zig') }}
                   restore-keys: |
