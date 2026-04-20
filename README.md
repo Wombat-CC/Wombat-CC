@@ -28,6 +28,12 @@ zig build -Doptimize=Debug
 # Fast compile check (no install, CI-oriented)
 zig build check -Doptimize=Debug -Dfast_ci=true
 
+# Optional: local edit/rebuild loop with incremental compilation
+zig build check -Doptimize=Debug -Dfast_ci=true -fincremental
+
+# Keep compiling on file changes (great during active coding)
+zig build check -Doptimize=Debug -Dfast_ci=true -fincremental --watch --debounce 100
+
 # Clean build outputs and cached SDK
 zig build clean
 ```
@@ -40,6 +46,10 @@ Speed-related build flags:
 - `-Dsdk_cache_path=<path>`: set where extracted SDK files are cached when auto-extraction is used (default: `.wombat-sdk-cache/kipr_sdk`)
 - `-Dfast_ci=true`: favors compile-validation throughput
 - `-Daggressive_speed=true`: reduces C/C++ diagnostics for faster C/C++ compilation
+- `-fincremental`: enables Zig incremental compilation (can reduce changed-file rebuild time; benchmark on your machine)
+- `--cache-dir <path>`: overrides local cache path (use a fast local disk)
+- `--global-cache-dir <path>`: overrides global cache path (useful for persistent shared cache)
+- `--watch --debounce <ms>`: rebuild automatically after changes
 
 ### Project Layout
 

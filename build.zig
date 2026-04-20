@@ -92,6 +92,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         translate_c.addIncludePath(kipr_include);
+        if (extract_step) |step| translate_c.step.dependOn(&step.step);
         break :blk &.{
             .{
                 .name = "wombat_c",
@@ -107,7 +108,8 @@ pub fn build(b: *std.Build) void {
 
     // ── User executable ──────────────────────────────────────────────
     const has_cpp_sources = cpp_files.len > 0;
-    const library_dep_count = countLibraryDependencies(b);
+    const library_dep_names = collectLibraryDependencyNames(b);
+    const library_dep_count = library_dep_names.len;
     const needs_libcpp = has_cpp_sources or library_dep_count > 0;
     std.log.info("Detected wombat_cc_lib_* dependencies: {d}", .{library_dep_count});
     std.log.info("libc++ linkage: {s}", .{if (needs_libcpp) "enabled" else "disabled"});
@@ -133,7 +135,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addLibraryPath(kipr_lib);
     exe.root_module.addRPath(.{ .cwd_relative = "/usr/lib" });
     exe.root_module.linkSystemLibrary("kipr", .{});
-    linkLibraryDependencies(b, exe, target, optimize, kipr_include);
+    linkLibraryDependencies(b, exe, target, optimize, library_dep_names, kipr_include);
 
     const c_compile_flags: []const []const u8 = if (fast_checks)
         &.{ "-std=c11", "-w" }
@@ -252,6 +254,9 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
         ) catch @panic("OOM");
     }
 
+    std.sort.heap([]const u8, c_files.items, {}, lessThanStringSlices);
+    std.sort.heap([]const u8, cpp_files.items, {}, lessThanStringSlices);
+
     return .{
         .has_zig_main = has_zig_main,
         .c_files = c_files.toOwnedSlice(b.allocator) catch &.{},
@@ -260,6 +265,10 @@ fn collectSources(b: *std.Build, dir_path: []const u8) SourceSet {
 }
 
 const lib_dep_prefix = "wombat_cc_lib_";
+
+fn lessThanStringSlices(_: void, lhs: []const u8, rhs: []const u8) bool {
+    return std.mem.order(u8, lhs, rhs) == .lt;
+}
 
 fn optimizeIntent(mode: std.builtin.OptimizeMode) []const u8 {
     return switch (mode) {
@@ -270,12 +279,17 @@ fn optimizeIntent(mode: std.builtin.OptimizeMode) []const u8 {
     };
 }
 
-fn countLibraryDependencies(b: *std.Build) usize {
-    var count: usize = 0;
+fn collectLibraryDependencyNames(b: *std.Build) []const []const u8 {
+    var dep_names: std.ArrayList([]const u8) = .empty;
     for (b.available_deps) |dep| {
-        if (std.mem.startsWith(u8, dep[0], lib_dep_prefix)) count += 1;
+        const dep_name = dep[0];
+        if (!std.mem.startsWith(u8, dep_name, lib_dep_prefix)) continue;
+
+        dep_names.append(b.allocator, dep_name) catch @panic("OOM");
     }
-    return count;
+
+    std.sort.heap([]const u8, dep_names.items, {}, lessThanStringSlices);
+    return dep_names.toOwnedSlice(b.allocator) catch &.{};
 }
 
 fn linkLibraryDependencies(
@@ -283,12 +297,10 @@ fn linkLibraryDependencies(
     exe: *std.Build.Step.Compile,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    library_dep_names: []const []const u8,
     kipr_include: std.Build.LazyPath,
 ) void {
-    for (b.available_deps) |dep| {
-        const dep_name = dep[0];
-        if (!std.mem.startsWith(u8, dep_name, lib_dep_prefix)) continue;
-
+    for (library_dep_names) |dep_name| {
         const lib_dep = b.lazyDependency(dep_name, .{
             .target = target,
             .optimize = optimize,

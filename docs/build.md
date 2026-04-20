@@ -46,6 +46,18 @@ Useful for CI and quick validation loops where you only need compile/link succes
 
 `zig build ci` is also available as a compile-only alias for CI-style usage.
 
+### Optional Fast Local Rebuild Loop (incremental)
+
+```sh
+zig build check -Doptimize=Debug -Dfast_ci=true -fincremental
+```
+
+For active development, you can also pair incremental mode with watch mode:
+
+```sh
+zig build check -Doptimize=Debug -Dfast_ci=true -fincremental --watch --debounce 100
+```
+
 ### Clean
 
 ```sh
@@ -72,6 +84,10 @@ Removes `zig-out/`, `zig-cache/`, and any extracted KIPR SDK cache created by th
 | `-Dsdk_cache_path=<path>` | `.wombat-sdk-cache/kipr_sdk` | Location for extracted SDK cache when `-Dkipr_sdk_path` is not set |
 | `-Dfast_ci=true` | `false` | Favors compile-check throughput (used by `zig build check`) |
 | `-Daggressive_speed=true` | `false` | Reduces C/C++ diagnostics (`-w`) to maximize compile throughput |
+| `-fincremental` | off | Enables Zig incremental compilation (may reduce changed-file rebuild time; benchmark per machine/project) |
+| `--cache-dir <path>` | Zig default | Override local Zig cache path (use fast local storage) |
+| `--global-cache-dir <path>` | Zig default | Override global Zig cache path (use persistent/shared storage) |
+| `--watch --debounce <ms>` | off / N/A | Rebuild automatically on changes with configurable debounce |
 
 Recommended fast validation loop:
 
