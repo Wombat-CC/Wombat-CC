@@ -5,7 +5,7 @@
 
 int main() 
 {
-    std::cout << "Welcome to your Wombat CC project (C++)\n";
+    std::cout << "Welcome to your Wombat CC project (C++)" << std::endl;
     std::cout << "Using KIPR libwallaby v" << KIPR_VERSION << std::endl;
 
     return 0;
