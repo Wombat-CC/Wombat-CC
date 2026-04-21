@@ -20,6 +20,9 @@ jobs:
 
         steps:
             - uses: actions/checkout@v6
+              with:
+                  submodules: recursive
+                  fetch-depth: 0
 
             - uses: mlugg/setup-zig@v2.2.1
               with:
