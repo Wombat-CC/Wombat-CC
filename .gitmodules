@@ -1,11 +1,9 @@
 [submodule "lib/Wombat-CC-Arm"]
 	path = lib/Wombat-CC-Arm
 	url = git@github.com:Wombat-CC/Wombat-CC-Arm.git
-
 [submodule "lib/Wombat-CC-Drivetrain"]
 	path = lib/Wombat-CC-Drivetrain
 	url = git@github.com:Wombat-CC/Wombat-CC-Drivetrain.git
-
 [submodule "lib/Wombat-CC-Utilities"]
 	path = lib/Wombat-CC-Utilities
 	url = git@github.com:Wombat-CC/Wombat-CC-Utilities.git
