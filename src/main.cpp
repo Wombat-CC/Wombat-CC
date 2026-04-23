@@ -9,7 +9,7 @@ int main()
     std::cout << "Welcome to your Wombat CC project (C++)" << std::endl;
     std::cout << "Using KIPR libwallaby v" << KIPR_VERSION << std::endl;
 
-    Wombat_CC::Utilities::autokill();
+    Wombat_CC::Utilities::ActivateKillSwitch();
 
     return 0;
 }
